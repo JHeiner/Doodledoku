@@ -1,6 +1,9 @@
 
 if (document.body.nodeName != "FRAMESET") {
 
+var baseRadius = 2;
+var pickRadius = baseRadius+2;
+var thicknesses = [baseRadius,baseRadius*2,pickRadius,pickRadius*2];
 var normalColor = "#333";
 var hiliteColor = "#f88";
 
@@ -15,6 +18,7 @@ svg.style.zIndex = 999999999;
 svg.style.top = 0;
 svg.style.left = 0;
 function svgResize() {
+	// todo? stretch doodles in clever ways?
 	svg.style.width = 0; svg.style.height = 0;
 	svg.style.width = document.body.scrollWidth;
 	svg.style.height = document.body.scrollHeight; }
@@ -24,7 +28,7 @@ svg.setAttribute("stroke-linejoin","round");
 svg.setAttribute("stroke-linecap","round");
 document.body.appendChild(svg);
 
-function shapeAllResize(pathWidth,circleRadius) {
+function shapeAllResize(circleRadius,pathWidth) {
 	for ( var shape = svg.firstChild ; shape ; shape = shape.nextSibling )
 		switch ( shape.nodeName ) {
 		case "circle": shape.setAttribute("r",circleRadius); break;
@@ -45,7 +49,7 @@ var clientX = 0; var clientY = 0; // so stash them here in all mouse events
 
 function shapeFindHilite() {
 	var found = [];
-	shapeAllResize(10,6);
+	shapeAllResize(thicknesses[2],thicknesses[3]);
 	for ( var hit = document.elementFromPoint(clientX,clientY)
 	      ; hit && hit.parentNode == svg
 	      ; hit = document.elementFromPoint(clientX,clientY) ) {
@@ -57,7 +61,7 @@ function shapeFindHilite() {
 		hit.setAttribute("pointer-events","none"); }
 	for ( var i = found.length - 1 ; i >= 0 ; -- i )
 		found[i].removeAttribute("pointer-events");
-	shapeAllResize(4,3);
+	shapeAllResize(thicknesses[0],thicknesses[1]);
 	if (found.length == 0) {
 		shapeListColor(svg.firstChild,normalColor);
 		return; }
@@ -89,7 +93,7 @@ function moveMouse(event) {
 		doodle = document.createElementNS(svgNS,"path");
 		doodle.setAttribute("d","m "+lastX+","+lastY
 		                    + " "+deltaX+","+deltaY);
-		doodle.setAttribute("stroke-width",4);
+		doodle.setAttribute("stroke-width",thicknesses[1]);
 		doodle.setAttribute("stroke",normalColor);
 		doodle.setAttribute("fill","none");
 		svg.appendChild(doodle); }
@@ -104,17 +108,17 @@ function upMouse(event) {
 	// svg.getIntersectionList is bounding-box based, hence useless
 	// don't require precision clicks to erase
 	var found = false;
-	shapeAllResize(10,6);
+	shapeAllResize(thicknesses[2],thicknesses[3]);
 	for ( var hit = document.elementFromPoint(clientX,clientY)
 	      ; hit && hit.parentNode == svg
 	      ; hit = document.elementFromPoint(clientX,clientY) ) {
 		if (event.ctrlKey) while (svg.lastChild != hit)
 			svg.removeChild(svg.lastChild);
 		svg.removeChild(hit); found = true; }
-	shapeAllResize(4,3);
+	shapeAllResize(thicknesses[0],thicknesses[1]);
 	if (found) return;
 	var dot = document.createElementNS(svgNS,"circle");
-	dot.setAttribute("r",3);
+	dot.setAttribute("r",thicknesses[0]);
 	dot.setAttribute("cx",lastX);
 	dot.setAttribute("cy",lastY);
  	dot.setAttribute("fill",normalColor);
@@ -138,11 +142,11 @@ var focusTest = function(hit) {
 	return null; }
 
 function downKey(event) {
-	if (event.keyCode == 17)
+	if (event.keyCode == 17/*ctrl*/)
 		shapeFindHilite(); }
 
 function upKey(event) {
-	if (event.keyCode == 17)
+	if (event.keyCode == 17/*ctrl*/)
 		shapeListColor(svg.firstChild,normalColor); }
 
 // communication with the extension
@@ -237,7 +241,7 @@ if (/^http:\/\/www\.puzzlemix\.com\/playgrid/.test(document.documentURI)) {
 	keyDown32.initKeyboardEvent("keydown",true, true,null,
 		false,false,false,false,32,32);
 	document.body.onkeydown = function(event) {
-		keypressed((event.keyCode == 107) ? keyDown32 : event); } }
+		keypressed((event.keyCode == 107/*numpad+*/) ? keyDown32 : event); } }
 
 else
 if (/^http:\/\/www\.sudoku\.org\.uk\/Puzzles/.test(document.documentURI)) {
@@ -259,7 +263,10 @@ for <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000">s
 			if (parent.nodeName == "OBJECT")
 				parent.parentNode.replaceChild(embeds[i],parent); } }
 	window.addEventListener("keydown",function(event) {
-		if (event.keyCode == 107) port.postMessage("toggle"); });
+		switch (event.keyCode) {
+		case 107/*numpad+*/: case 27/*esc*/:
+			port.postMessage("toggle");
+			event.preventDefault(); } });
  }
 
 } // if not frameset
