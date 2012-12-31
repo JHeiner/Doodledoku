@@ -1,20 +1,40 @@
 
-import java.awt._
-import java.awt.event._
-import java.awt.image._
-import javax.swing._
-import javax.swing.event._
+import java.awt.{Container,Graphics,Graphics2D,Color,Dimension,BasicStroke,Polygon,Robot}
+import java.awt.geom.Line2D
+import java.awt.event.{ActionEvent,ActionListener,MouseEvent,InputEvent,KeyEvent,KeyListener}
+import javax.swing.event.MouseInputListener
+import javax.swing.{JComponent,JFrame,JRootPane,SwingUtilities,Timer,WindowConstants}
+import java.nio.ByteBuffer
+import java.nio.channels.{ServerSocketChannel,SocketChannel}
+import java.net.{InetAddress,InetSocketAddress}
 
-object Main
+class Polyline( x:Int, y:Int ) extends Polygon
 {
-  def main( args:Array[String] ) {
-    SwingUtilities.invokeLater( new Runnable {
-      def run { new Doodle } } ) }
+  addPoint( x, y )
+
+  def add( x:Int, y:Int ) = {
+    val p = npoints - 1
+    if ( x != xpoints(p) || y != ypoints(p) )
+      addPoint( x, y )
+    this }
+
+  def dot =
+    add( xpoints(0)+1, ypoints(0)+1 )
+
+  def near( x:Double, y:Double ):Boolean = {
+    for ( p <- 1 until npoints )
+      if ( 9 > Line2D.ptSegDistSq(
+        xpoints(p-1), ypoints(p-1), xpoints(p), ypoints(p), x, y ) )
+        return true
+    return false }
+
+  def draw( graphics:Graphics ) {
+    graphics.drawPolyline( xpoints, ypoints, npoints ) }
 }
 
 class Devices extends Robot
 {
-  setAutoDelay( 200 )
+  setAutoDelay( 100 )
 
   def click( button:Int ) {
     mousePress( button ) ; mouseRelease( button ) }
@@ -23,97 +43,138 @@ class Devices extends Robot
 
   def key( code:Int ) {
     keyPress( code ) ; keyRelease( code ) }
-  def key( event:KeyEvent ) {
-    key( event.getKeyCode ) }
+  def key( char:Char ) {
+    key( KeyEvent.getExtendedKeyCodeForChar( char ) ) }
 
-  def visible( component:Component, value:Boolean ) {
-    component.setVisible( value ) }
+  def visible( container:Container, value:Boolean ) {
+    container.setVisible( value ) ; delay( 100 ) }
 
-  def state( frame:Frame, value:Int ) {
-    frame.setState( value ) }
-
-  def hideClickKeyClickShow( event:KeyEvent ) {
-    visible( event.getComponent, false )
-    click() ; key( event ) ; click()
-    visible( event.getComponent, true ) }
-
-  def hideCaptureRestore( frame:Frame, area:Rectangle ) = {
-    state( frame, Frame.ICONIFIED )
-    delay( 300 ) // to let the zooming animation get out of the way
-    val image = createScreenCapture( area )
-    state( frame, Frame.NORMAL )
-    image }
+  def hideClickKeyClickShow( container:Container, char:Char ) {
+    visible( container, false )
+    click() ; key( char ) ; click()
+    visible( container, true ) }
 }
 
-class Doodle extends JFrame( "Doodle" )
+class Client( socket:SocketChannel )
 {
-  frame =>
+  var lastRead = 0
+  def read( buffer:ByteBuffer ) =
+    if ( lastRead < 0 ) false else {
+      buffer.clear()
+      socket.configureBlocking( false )
+      try { lastRead = socket.read( buffer ) }
+      catch { case _ => lastRead = -1 }
+      if ( lastRead < 0 ) {
+	socket.close()
+	false }
+      else {
+	if ( lastRead > 0 ) {
+	  buffer.flip()
+	  while ( buffer.hasRemaining )
+	    Console.print( buffer.get.asInstanceOf[Char] )
+	  Console.println() }
+	true } }
+  def write( buffer:ByteBuffer ) {
+    buffer.rewind()
+    socket.configureBlocking( true )
+    try { while ( buffer.hasRemaining ) socket.write( buffer ) }
+    catch { case _ => socket.close() ; lastRead = -1 } }
+}
 
-  // redirect our content pane's paint requests to a method defined below...
-  getRootPane.setContentPane( new JComponent {
-    override def paintComponent( graphics:Graphics ) {
-      frame.paintOurContentPane( graphics.asInstanceOf[Graphics2D] ) } } )
+class Doodle extends JComponent
+with MouseInputListener with KeyListener with ActionListener
+{
+  private val stroke = new BasicStroke( 2.0f )
+  private var lines = List.empty[Polyline]
 
-  // resizes always repaint, so ensure frame moves aren't optimized away...
-  addComponentListener( new ComponentAdapter {
-    override def componentMoved( evt:ComponentEvent ) {
-      frame.getRootPane.getContentPane.repaint() } } )
+  private val server = ServerSocketChannel.open
+    .bind( new InetSocketAddress( "127.0.0.1", 8421 ) )
+  server.configureBlocking( false )
+  private val buffer = ByteBuffer.allocate( 4096 )
+  private var clients = List.empty[Client]
+  new Timer( 1000, this ).start()
+  def actionPerformed( event:ActionEvent ) {
+    var accept = server.accept()
+    var changed = false
+    while ( accept != null ) {
+      clients = new Client( accept ) :: clients
+      changed = true
+      accept = server.accept() }
+    var (keep,drop) = clients partition { _.read( buffer ) }
+    if ( drop.nonEmpty ) changed = true
+    if ( changed )
+      getTopLevelAncestor.asInstanceOf[JFrame].setTitle("Doodle:"+keep.size)
+    clients = keep }
+
+  private var restore:Dimension = null
+  private def jiggle() {
+    // some unexplained buffering of transparent window... filtered
+    // doodles hang around until resize forces buffer to be cleared
+    val window = getTopLevelAncestor ; restore = window.getSize
+    window.setSize( restore.width, restore.height+1 ) }
+
+  override def paintComponent( argument:Graphics ) {
+    if ( restore != null ) { // 2nd part of jiggle
+      getTopLevelAncestor.setSize( restore ) ; restore = null }
+    val graphics = argument.asInstanceOf[Graphics2D]
+    val originalStroke = graphics.getStroke
+    graphics.setStroke( stroke )
+    lines foreach { _.draw( graphics ) }
+    graphics.setStroke( originalStroke ) }
+
+  def mousePressed( event:MouseEvent ) {
+    lines = new Polyline( event.getX, event.getY ) :: lines
+    addMouseMotionListener( this ) }
+
+  def mouseDragged( event:MouseEvent ) {
+    lines.head.add( event.getX, event.getY )
+    repaint() }
+
+  def mouseReleased( event:MouseEvent ) {
+    mouseDragged( event )
+    if ( lines.head.npoints < 2 ) {
+      val single = lines.head
+      var (drop,keep) = lines.tail partition { _.near( event.getX, event.getY ) }
+      lines = if ( drop.nonEmpty ) keep else single.dot :: keep
+      jiggle() }
+    removeMouseMotionListener( this ) }
+
+  def mouseClicked( event:MouseEvent ) {}
+  def mouseEntered( event:MouseEvent ) {}
+  def mouseExited( event:MouseEvent ) {}
+  def mouseMoved( event:MouseEvent ) {}
+  addMouseListener( this )
 
   private val devices = new Devices
-  private val obscuredArea = new Rectangle
-  private var capturedArea:Rectangle = null
-  private var capturedImage:BufferedImage = null
-  private var capturedDraw:Graphics2D = null
+  def keyTyped( event:KeyEvent ) {
+    event.getKeyChar match {
+      case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+          | ' ' | '\b' | '\n' =>
+        devices.hideClickKeyClickShow( getTopLevelAncestor, event.getKeyChar )
+      case 't' => buffer.clear()
+	buffer.put('h'.toByte).put('i'.toByte).put('\n'.toByte).flip()
+	clients foreach { _.write( buffer ) }
+      case '-' => lines = lines.tail ; jiggle()
+      case 'X' => lines = List.empty[Polyline] ; jiggle()
+      case value => println("nope:"+event) } }
 
-  def paintOurContentPane( graphics:Graphics2D ) {
-    val content = getRootPane.getContentPane
-    content.getBounds( obscuredArea )
-    obscuredArea.setLocation( content.getLocationOnScreen )
-    if ( obscuredArea != capturedArea ) {
-      SwingUtilities.invokeLater( recapture ) }
-    if ( capturedImage != null )
-      graphics.drawImage( capturedImage, 0, 0, null ) }
+  def keyPressed( event:KeyEvent ) {}
+  def keyReleased( event:KeyEvent ) {}
+  addKeyListener( this )
+  setFocusable( true )
+}
 
-  private val recapture = new Runnable {
-    def run() {
-      capturedImage = devices.hideCaptureRestore( frame, obscuredArea )
-      capturedArea = new Rectangle( obscuredArea )
-      capturedDraw = capturedImage.createGraphics
-      capturedDraw.setStroke( new BasicStroke( 2.0f ) )
-      capturedDraw.drawRect( 0, 0, capturedArea.width, capturedArea.height )
-      capturedDraw.setColor( Color.BLACK )
-      capturedDraw.translate( offset.x, offset.y ) } }
-
-  addKeyListener( new KeyAdapter {
-    override def keyPressed( evt:KeyEvent ) {
-      devices.hideClickKeyClickShow( evt ) } } )
-
-  addMouseListener( new MouseInputAdapter() {
-    listener =>
-    private var pvx:Int = 0
-    private var pvy:Int = 0
-    override def mousePressed( evt:MouseEvent ) {
-      pvx = evt.getX ; pvy = evt.getY
-      frame.addMouseMotionListener( listener ) }
-    override def mouseReleased( evt:MouseEvent ) {
-      mouseDragged( evt )
-      frame.removeMouseMotionListener( listener ) }
-    override def mouseDragged( evt:MouseEvent ) {
-      val nwx = evt.getX ; val nwy = evt.getY
-      if ( nwx != pvx || nwy != pvy ) {
-	if ( capturedDraw != null ) {
-	  capturedDraw.drawLine( pvx, pvy, nwx, nwy )
-	  repaint() }
-	pvx = nwx ; pvy = nwy } }
-    }
-   )
-
-  setDefaultCloseOperation( WindowConstants.DISPOSE_ON_CLOSE )
-  override def getPreferredSize = new Dimension( 400, 300 )
-  pack() ; setVisible( true )
-
-  private val offset =
-    SwingUtilities.convertPoint( frame, 0, 0, getRootPane.getContentPane )
-
+object Main
+{
+  def main( args:Array[String] ) {
+    SwingUtilities.invokeLater( new Runnable { def run {
+      val frame = new JFrame( "Doodle" )
+      frame.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
+      frame.setUndecorated( true )
+      frame.getRootPane.setWindowDecorationStyle( JRootPane.FRAME )
+      frame.setBackground( new Color( 0, 0, 0, 0 ) )
+      frame.getRootPane.setContentPane( new Doodle )
+      frame.setSize( 400, 300 )
+      frame.setVisible( true ) } } ) }
 }
 
