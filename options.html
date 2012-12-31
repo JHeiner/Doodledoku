@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
+See LICENSE file for info. -->
 <head>
 <title>Doodledoku Help &amp; Options</title>
 <script src="jquery-1.8.2/jquery.min.js"></script>
@@ -26,6 +28,7 @@
 <li><a href=#about>Why</a></li>
 <li><a href=#ports>Toggling</a></li>
 <li><a href=#known>Bugs?</a></li>
+<li><a href=#diffs>Changes</a></li>
 <li><a href=#tweak>Options</a></li>
 </ul>
 
@@ -148,9 +151,26 @@ report</a>.</p>
 <dt>Framesets</dt><dd>
 <p>Doodles cannot cross the borders between frames.</p>
 </dd>
+<dt>Flash</dt><dd>
+<p>The Flash player is capable of drawing inside the browser window, but the
+default configuration is to draw on top of the browser window. The authors of
+each web page make that decision, but they rarely need to display anything over
+the top of Flash content, so they use the default. Unfortunately this means
+doodles will most likely be hidden underneath the Flash content.</p>
+</dd>
 </dl>
-<p>I haven't yet set up a mechanism to report actual bugs, but soon as I do I
-will put a link here.</p>
+<p>The Chrome Web Store has pages where you can <a
+href="https://chrome.google.com/webstore/support/adcigljcdlemflbekljdfohfpipeolof">report bugs + make suggestions</a> and/or <a
+href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdfohfpipeolof/reviews">rate + write a review</a>.</p>
+</div>
+
+<div id=diffs>
+In version:
+<p>3 <small><i>(2012-11-05)</i></small><ul>
+    <li>Allow a tiny bit of movement in click-to-erase.</li>
+    <li>Updated help (Flash player, bug reports, changes page).</li></ul></p>
+<p>2 <small><i>(2012-10-16)</i></small> Fixed some typos in the help.</p>
+<p>1 <small><i>(2012-10-16)</i></small> First upload (never made public).</p>
 </div>
 
 <div id=tweak>

@@ -1,8 +1,8 @@
 
 {
 "name": "Doodledoku",
-"version": "1",
-"description": "Doodle on web pages, even pages with Sudoku puzzles. See the 'Options' page for more info...",
+"version": "3",
+"description": "Doodle on web pages, even pages with Sudoku puzzles!",
 "icons": {
     "16": "pencil-16.png",
     "48": "pencil-48.png",

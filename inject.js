@@ -1,3 +1,5 @@
+// Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
+// See LICENSE file for info.
 
 var svgNS = "http://www.w3.org/2000/svg";
 
@@ -102,9 +104,11 @@ mouseXY.eraseElseDot = function() {
 	svg.appendChild(c); }
 
 mouseXY.pathMore = function() {
-	var d = this.path.getAttribute("d")
-	    + " "+(this.lastX-this.prevX)+","+(this.lastY-this.prevY);
-	this.path.setAttribute("d",d); }
+	var x = this.lastX-this.prevX;
+	var y = this.lastY-this.prevY;
+	if (x != 0 || y != 0)
+		this.path.setAttribute("d", this.path.getAttribute("d")
+			+ " "+x+","+y); }
 
 mouseXY.pathStart = function() {
 	var p = document.createElementNS(svgNS,"path");
@@ -115,7 +119,19 @@ mouseXY.pathStart = function() {
 	this.path = p;
 	this.pathMore(); }
 
+var nearPoint = /^ (0,-?[12]|-?[12],0|-?1,-?1)$/
+
 mouseXY.pathEnd = function() {
+	if (this.path == null) return;
+	var d = this.path.getAttribute("d")
+	var s = d.lastIndexOf(" ")
+	this.path.setAttribute("pointer-events","none");
+	if (d.lastIndexOf(" ",s) != 1
+		&& nearPoint.test(d.substr(s))
+		&& this.erase(false))
+		svg.removeChild(this.path);
+	else
+		this.path.removeAttribute("pointer-events");
 	this.path = null; }
 
 mouseXY.hilite = function() {
@@ -225,9 +241,7 @@ function upMouse(event) {
 
 function focusToMouse(event) {
 	var was = mouseXY.focused;
-	mouseXY.focus();
-	if (mouseXY.focused != was)
-console.log(mouseXY.lastX+","+mouseXY.lastY+" - "+mouseXY.clientX+","+mouseXY.clientY); }
+	mouseXY.focus(); }
 
 function downKey(event) {
 	if (event.keyCode == 17/*ctrl*/)
