@@ -126,7 +126,7 @@ mouseXY.pathEnd = function() {
 	var d = this.path.getAttribute("d")
 	var s = d.lastIndexOf(" ")
 	this.path.setAttribute("pointer-events","none");
-	if (d.lastIndexOf(" ",s) != 1
+	if (d.lastIndexOf(" ",s-1) == 1
 		&& nearPoint.test(d.substr(s))
 		&& this.erase(false))
 		svg.removeChild(this.path);

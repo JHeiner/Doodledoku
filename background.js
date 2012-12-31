@@ -1,3 +1,5 @@
+// Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
+// See LICENSE file for info.
 
 var request = new XMLHttpRequest();
 request.open("GET", chrome.extension.getURL("inject.js"), false);

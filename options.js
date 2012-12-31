@@ -1,3 +1,5 @@
+// Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
+// See LICENSE file for info.
 
 $(function () {
 
