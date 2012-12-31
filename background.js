@@ -15,6 +15,10 @@ function disconnect(port) { port.disconnect(); }
 var tabHash = {}; var portCount = 0;
 notifyState(false); notifyCount(0);
 
+function notifyTabState(tabId) {
+	var found = tabHash[tabId];
+	notifyState( (!found) ? false : found.isActive ); }
+
 chrome.browserAction.onClicked.addListener(function(tab) {
 	var found = tabHash[tab.id];
 	if (found) found.toggle(); else {
@@ -35,10 +39,6 @@ chrome.browserAction.onClicked.addListener(function(tab) {
 				notifyState(false); } };
 		chrome.tabs.executeScript(tab.id,injected); } });
 
-chrome.tabs.onActivated.addListener(function(info) {
-	var found = tabHash[info.tabId];
-	notifyState( (!found) ? false : found.isActive ); });
-
 chrome.extension.onConnect.addListener(function(port) {
 	var found = tabHash[port.sender.tab.id];
 	if (!found) {
@@ -47,5 +47,15 @@ chrome.extension.onConnect.addListener(function(port) {
 	else {
 		if (found.isActive) { sendAttach(port); notifyState(true); }
 		found.ports.push(port); notifyCount(++portCount);
-		port.onDisconnect.addListener(function() {found.destroy()}); } });
+		port.onDisconnect.addListener(function() {found.destroy()});
+		port.onMessage.addListener(function(message) {
+			if (message=="toggle") found.toggle(); }); } });
+
+chrome.tabs.onActivated.addListener(function(info) {
+	notifyTabState(info.tabId); });
+
+chrome.windows.onFocusChanged.addListener(function(winId) { if (winId != -1)
+	chrome.tabs.query( { active:true, windowId:winId }, function(tabs) {
+		if (tabs.length != 1) console.error(tabs);
+		else notifyTabState(tabs[0].id); }); });
 
