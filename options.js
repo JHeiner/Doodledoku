@@ -1,12 +1,11 @@
 
 $(function () {
 
-	$("#banner").addClass("ui-widget-content ui-corner-all");
-
 	var $tabs = $("#contents").tabs();
 
 	$("#expandAll").on("click",function() {
-		$('details').each(function() { this.setAttribute("open","") }) });
+		$('details').each(function() {
+			this.setAttribute("open",""); }); });
 
 	var inject = document.createElement("script");
 	inject.setAttribute("src","inject.js");
@@ -14,7 +13,10 @@ $(function () {
 
 	var code = localStorage.Options;
 	if (code) $tabs.tabs('select','#tweak');
-	else code = "// put your javascript here\n\n";
+	else code = "// put your javascript here.\n"
+		+"// changes are saved automatically\n"
+		+"// 1 second after you stop typing.\n"
+		+"\n";
 
 	var delayed = null;
 	var mirror = CodeMirror(document.getElementById("tweak"), {

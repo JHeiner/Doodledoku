@@ -7,7 +7,7 @@
     "16": "pencil-16.png",
     "48": "pencil-48.png",
     "128": "pencil-128.png" },
-"background": { "page": "background.html" },
+"background": { "scripts": ["background.js"] },
 "options_page": "options.html",
 "browser_action": {
 	"default_icon": "pencil-16.png",

@@ -55,7 +55,7 @@ rubberSet(-1,-1,0,0);
 
 function rubberErase() {
 	var shapes = svg.getEnclosureList(rubberArea,svg);
-	for ( index = shapes.length - 1 ; index >= 0 ; --index )
+	for ( var index = shapes.length - 1 ; index >= 0 ; --index )
 		svg.removeChild(shapes[index]);
 	allShapes(normalColor); }
 
@@ -140,7 +140,7 @@ mouseXY.rubber = function() {
 	          Math.abs(this.lastY-this.downY));
 	allShapes(normalColor);
 	var shapes = svg.getEnclosureList(rubberArea,svg);
-	for ( index = shapes.length - 1 ; index >= 0 ; --index )
+	for ( var index = shapes.length - 1 ; index >= 0 ; --index )
 		oneShape(shapes[index],eraserColor); }
 
 function State(name,mouse,ctrl) {

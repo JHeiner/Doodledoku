@@ -8,70 +8,65 @@
 <link rel=stylesheet href="codemirror-2.34/codemirror.css">
 <script src="codemirror-2.34/javascript.js"></script>
 <style>
-	#quick summary, #quick ul, #quick li { margin:8px; }
-	.skinny { width:2em; } p { line-height:150%; }
+	summary, details ul, details li { margin:8px; }
+	p { line-height:150%; margin: 5px 0 10px 0; }
+	kbd { border: solid grey 1px; padding: 0 2px; background:white; }
 	.CodeMirror-scroll { height:auto; overflow-y:hidden; overflow-x:auto; }
 </style>
 <script src="options.js"></script>
 </head>
-<body style="background:#eee;padding:10px; min-width: 682px;">
-<div id=banner style="padding: 15px 15px 15px 25px;">
-<svg width=512 height=128 style="fill:none;stroke:black;stroke-width:7;stroke-linecap:square">
-<path d="m 27,14 0,5 -1,4 -1,4 -1,4 -1,4 -1,4 -2,5 -1,6 -1,4 -1,4 -1,5 -1,5 0,5 -1,4 -1,5 0,5 -1,4 -1,4 0,5 -1,4 -1,4 -2,4"/>
-<path d="m 25,6 6,0 4,1 5,0 6,0 4,1 5,0 5,0 5,1 4,1 5,1 4,1 5,1 4,1 4,2 4,3 4,3 3,3 2,4 2,4 1,4 2,4 1,4 2,4 1,4 1,4 0,5 0,5 -1,4 -2,4 -1,4 -1,4 -2,4 -3,4 -2,4 -3,4 -3,3 -4,3 -4,3 -5,3 -3,3 -4,2 -4,2 -4,2 -4,1 -4,1 -6,1 -5,0 -5,0 -5,0 -4,-1 -4,-1 -6,-1 -5,0 -5,0 -5,-1 -6,0"/>
-<path d="m 169,59 -5,0 -4,-1 -5,0 -5,0 -4,2 -4,1 -4,2 -4,3 -2,4 -2,4 -2,4 -1,4 -2,5 -1,5 -1,4 0,6 3,4 4,3 4,2 4,2 6,0 5,1 5,0 4,1 5,0 5,0 4,-1 4,-1 4,-1 5,-1 4,-2 3,-3 3,-3 3,-4 0,-5 -1,-4 -3,-4 -3,-4 -3,-3 -3,-3 -3,-3 -3,-3 -3,-3 -4,-3 -3,-3"/>
-<path d="m 249,63 -6,1 -6,1 -4,2 -4,2 -3,3 -3,3 -3,3 -4,3 -2,4 -1,4 -1,5 0,6 0,5 3,4 4,3 4,2 4,1 5,1 5,0 5,0 5,0 6,0 5,-1 4,-1 6,0 4,-1 4,-1 4,-2 3,-5 0,-5 0,-6 -2,-4 -2,-5 -3,-4 -2,-4 -4,-3 -3,-3 -4,-2 -4,-3 -4,-2 -4,-2 -4,-1 -4,-1"/>
-<path d="m 370,72 -3,-3 -4,-3 -4,-2 -4,-1 -4,-2 -5,-1 -5,0 -5,0 -4,1 -4,1 -4,2 -5,2 -4,3 -3,3 -4,3 -3,4 -2,5 -2,4 0,5 2,5 2,4 3,3 3,3 3,3 3,3 4,1 5,0 5,0 4,-1 5,-2 4,-2 4,-1 4,-2 4,-2 5,0"/>
-<path d="m 384,3 -1,4 -1,4 -1,4 -1,5 -1,5 -1,4 -1,4 -1,5 0,6 -2,4 0,5 -1,6 0,5 -1,4 -1,5 -2,5 0,5 -1,4 -1,4 -1,5 -1,5 -1,5 -1,4 0,6 -1,4"/>
-<path d="m 410,6 -2,4 -1,5 -1,4 -1,5 -1,4 -1,4 -1,4 0,5 -2,4 -1,4 -1,4 -1,6 -1,4 0,5 -1,4 -1,4 0,6 -1,4 0,6 0,5 0,5 0,5 0,5 -1,4 -1,4"/>
-<path d="m 426,92 7,0 6,0 5,0 6,0 5,0 5,0 5,0 5,0 5,0 4,-2 4,-2 1,-5 -3,-4 -3,-3 -3,-3 -4,-2 -4,-2 -5,-1 -4,-1 -5,-1 -5,0 -5,0 -5,-1 -5,0 -4,1 -4,2 -4,3 -2,4 -1,4 -1,4 -1,4 0,6 1,5 1,4 3,4 3,4 3,3 4,2 4,1 5,1 5,1 6,0 6,0 5,-1 6,0 5,0 6,0 4,1 5,0 4,1 5,1 4,2 4,1 4,2"/>
-</svg><img src="pencil-128.png"></div>
+<body style="background:#eee;padding:10px;min-width:715px;">
+<div class="ui-widget-content ui-corner-all" style="padding: 0 15px">
+<img src="pencil-128.png" style="vertical-align:bottom;">
+<h1 style="display:inline;position:relative;left:-20px;font: italic 80pt sans-serif;letter-spacing:-7pt;">Doodledoku</h1>
+</div>
 <div id=contents>
 <ul>
 <li><a href=#quick>Quick</a></li>
 <li><a href=#about>Why</a></li>
-<li><a href=#ports>Toggle</a></li>
+<li><a href=#ports>Toggling</a></li>
+<li><a href=#known>Bugs?</a></li>
 <li><a href=#tweak>Options</a></li>
 </ul>
 
 <div id=quick>
 <details>
-<summary>Click the little pencil button (near omnibox) to toggle doodling on/off.</summary>
+<summary><kbd>Click</kbd> the little pencil button (near omnibox) to toggle doodling on/off.</summary>
 	<ul>
 	<li>go ahead: you can try it out now</li>
 	<li>green box means doodling is on, black means it is off</li>
-	<li>toggle doodling off to mouse things on the page</li>
 	<li>the box number indicates how many pages are being doodled on</li>
-	<li>if there are zero doodled pages the box is hidden</li>
+	<li>if there are zero pages being doodled on then the box is hidden</li>
+	<li>toggle doodling off to mouse things on the page</li>
 	</ul>
 </details>
 <br>When doodling is on:
 <details>
-<summary>Drag the mouse to doodle.</summary>
+<summary><kbd>Drag</kbd> the mouse to doodle.</summary>
 	<ul>
-	<li>here "drag" means "move mouse while holding down mouse button"</li>
-	<li>click (without drag) in empty area to make a dot</li>
+	<li>that means "move mouse while holding down mouse button"</li>
+	<li><kbd>click</kbd> (with no <kbd>drag</kbd>) in an undoodled spot to make a dot</li>
 	</ul>
 </details>
 <details>
-<summary>Click on doodles to erase them.</summary>
+<summary><kbd>Click</kbd> on doodles to erase them.</summary>
 	<ul>
-	<li>erasing is permanent (undo not available)</li>
-	<li>when doodles cross, clicking intersection erases all of them</li>
+	<li>erasing is permanent (undo is not available)</li>
+	<li>when doodles cross, <kbd>click</kbd>ing intersection erases all of them</li>
 	</ul>
 </details>
 <details>
-<summary>Hold "control" key to erase more doodles.</summary>
+<summary>Hold <kbd>ctrl</kbd> key to hilight &amp; erase oodles of doodles.</summary>
 	<ul>
-	<li>doodles under mouse and any made since them are hilighted</li>
-	<li>ctrl+click erases all hilighted doodles</li>
-	<li>or ctrl+drag to sweep area &amp; erase contained doodles</li>
+	<li>doodles under mouse and any made more recently are hilighted</li>
+	<li><kbd>ctrl</kbd>+<kbd>click</kbd> erases all hilighted doodles</li>
+	<li>or <kbd>ctrl</kbd>+<kbd>drag</kbd> to sweep area &amp; erase the enclosed doodles</li>
 	</ul>
 </details>
 <details>
 <summary>Keyboard focus follows the mouse.</summary>
 	<ul>
-	<li>doodles don't react to typing (just ctrl, as described above)</li>
+	<li>doodles don't react to typing (except <kbd>ctrl</kbd>, as described above)</li>
 	<li>keyboard events go to the focusable elements on the page</li>
 	</ul>
 </details>
@@ -80,7 +75,7 @@
 <summary>Reloading or navigating away from a page erases all its doodles.</summary>
 	<ul>
 	<li>doodling is toggled off for that page</li>
-	<li>erasing is permanent (undo not available)</li>
+	<li>erasing is permanent (undo is not available)</li>
 	</ul>
 </details>
 <br><button id=expandAll>Expand All</button>
@@ -88,17 +83,18 @@
 
 <div id=about>
 <p>I enjoy playing Sudoku online, but it can get a little annoying because each
-site has a slightly different way to interact. On many (but not all) sites you
-can click and then type a number to solve a cell. But there are almost as many
-ways to mark candidates as there are sites with puzzles. And some sites don't
-even support marks! I created this extension to smooth over these differences
-so I don't have to worry as much about which site I'm on and I can instead just
-work on the puzzles.</p>
+site has a slightly different way to interact. On most sites you can click and
+then type a number to solve a cell. But there are almost as many ways to mark
+candidates as there are sites with puzzles. And some sites don't even support
+marks! I created this extension to smooth over these differences so I don't have
+to worry as much about which site I'm on and I can instead just work on the
+puzzles.</p>
 <p>I know if I print out the page I can make all those site differences
 completely disappear, and all I need to know is how to use a pencil. I'm sure
 you've guessed by now that this is the inspiration behind this extension. The
-pencil-and-paper interaction is fairly easy to implement, and also easy to
-understand and use. And it should not interfere much at all with most sites.</p>
+pencil-and-paper interaction is fairly easy to implement, but more importantly
+it is easy to understand and use. And it should work with pretty much any
+site.</p>
 <p>There are other extensions that let you doodle. Some even let you share your
 doodles with the world. And there are fully featured drawing programs that run
 in the browser. Those are fantastic extensions/apps, but they don't feel quite
@@ -106,17 +102,55 @@ right for this task. They make the doodles the important thing when instead it
 should be the puzzle solving.</p>
 <p>I should also point out that there are apps available (not necessarily
 browser based) specifically for solving puzzles. They are also fantastic, but I
-find much more satisfaction from doing all the work myself. So, in keeping with
-the inspiration, this extension helps to solve puzzles as much as
+find much more satisfaction from doing the work myself. So, in keeping with
+the inspiration, this extension helps to solve puzzles only as much as
 pencil-and-paper does.</p>
 </div>
 
 <div id=ports>
-<p>The simple way to think of the doodle button is as a toggle, but (of course)
-the reality is slightly more complicated. Some javascript code must be injected
-into a page to allow doodling, but it would be a waste to do that work for all
-the pages that never get doodled upon. So the first time you press the doodle
-button is 
+<p>The simple way to think of the doodle button is as a toggle, but, of course,
+the reality is a bit more complicated. Some javascript code must be injected
+into a page to allow doodling, but it would be a waste to do that to all the
+pages that never get doodled upon. So the first time you press the doodle button
+isn't really a toggle at all. This extension's background page keeps track of
+which pages have been injected, so when you click on the button it knows whether
+to tell the page to toggle or to inject the doodling code into the page.</p>
+<p>Why does this matter? Well, at the moment the only way to set any options is
+to add your own javascript code to the injected code. What you enter on the
+<b>Options</b> tab is appended to the contents of the
+<a href="hack.html">inject.js</a> file, and the result is what gets
+injected. Yes, it is a stretch to call this "setting options", but that's how it
+works for now. You'll need to understand what is being injected and exactly when
+that code gets injected in order to do anything useful with the <b>Options</b>
+tab.</p>
+</div>
+
+<div id=known>
+<p>Here are some behaviors that might seem like bugs at first, but are really
+due to things that this extension can't do much about:</p>
+<dl>
+<dt>Resizing</dt><dd>
+<p>Changing the size of the browser window can cause things on the page to move
+around in very complex ways. Figuring out which thing a doodle should move with
+would be incredibly complicated. It's a fun idea, but it doesn't seem practical
+at all. So doodles just never move at all: each has a fixed position from the
+upper-left corner of the window.</p>
+</dd>
+<dt>Zooming</dt><dd>
+<p>Almost everything works fine when zoomed in or out... except the type of
+erasing where you sweep out an area around doodles. This seems to be a bug in
+the browser, and so I've filed a
+<a href="http://code.google.com/p/chromium/issues/detail?id=155277">bug
+report</a>.</p>
+<p>Until that bug gets fixed you'll have to cancel zooming
+(<kbd>ctrl</kbd>+<kbd>0</kbd>) before using this type of erasing.</p>
+</dd>
+<dt>Framesets</dt><dd>
+<p>Doodles cannot cross the borders between frames.</p>
+</dd>
+</dl>
+<p>I haven't yet set up a mechanism to report actual bugs, but soon as I do I
+will put a link here.</p>
 </div>
 
 <div id=tweak>
