@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<title>DoodleDoKu Help &amp; Options</title>
+<head>
+<title>Doodledoku Help &amp; Options</title>
 <link rel=stylesheet href="lib/css/black-tie/jquery-ui-1.8.22.custom.css"/>
 <script src="lib/js/jquery-1.7.2.js"></script>
 <script src="lib/js/jquery-ui-1.8.22.custom.min.js"></script>
-<link rel=stylesheet href="options.css"/>
+<style>
+	#quick summary, #quick ul, #quick li { margin: 8px; }
+	p { line-height: 150%; }
+</style>
 <script src="options.js"></script>
+</head>
 <body style="background:#eee;padding:10px; min-width: 682px;">
 <div id="banner" style="padding: 15px 15px 15px 25px;">
 <svg width="512" height="128" style="fill:none;stroke:black;stroke-width:7;stroke-linecap:square">
@@ -19,23 +24,97 @@
 </svg><img src="pencil-128.png"></div>
 <div id="contents">
 <ul>
-<li><a href="#about">About</a></li>
-<li><a href="#usage">Usage</a></li>
+<li><a href="#quick">Quick</a></li>
+<li><a href="#about">Why</a></li>
+<li><a href="#ports">Toggle</a></li>
+<li><a href="#tweak">Options</a></li>
 </ul>
-<div id="about">
-Playing sudoku online is fun, but it can get a little annoying because each site has a slightly different way to interact. There is at least some agreement on how to solve a cell: clicking in it then typing a number almost always works. Almost. But when it comes to marking candidates there is a lot of variation. The goal of this extension is to let me work on puzzles the way I want, regardless of what site they come from.
-<p>
-A secondary goal is to keep the extension as small as possible: there is no need to build yet another tool that does absolutely everything. The inspiration comes from the observation that the interaction with any puzzle becomes exactly the same once it is printed out. So the basic job of the extension is to act like the web page is a piece of paper and let the user doodle on it.
-<p>
-</div>
-<div id="usage">
-Basics: <ul>
-<li>Click and drag to doodle.</li>
-<li>Click on an empty spot to put a dot.</li>
-<li>Click on existing doodles to erase.</li>
-</ul>
-<p>
-There is one advanced feature: holding "Ctrl" and erasing gets rid of the doodle clicked on and all the doodles that were drawn afterwards.
-</div>
+
+<div id="quick">
+<details>
+<summary>Click the little pencil button (up near the wrench) to toggle doodling on/off.</summary>
+	<ul>
+	<li>green box means doodling is on, black means it is off</li>
+	<li>toggle doodling off to mouse the links&amp;etc. on the page</li>
+	<li>the box number indicates how many pages are being doodled upon</li>
+	<li>if there are zero doodled pages the box is hidden</li>
+	</ul>
+</details>
+<br>When doodling is on:
+<details>
+<summary>Click and drag to doodle.</summary>
+	<ul>
+	<li>click (without drag) to make a dot</li>
+	</ul>
+</details>
+<details>
+<summary>Click on doodles to erase them.</summary>
+	<ul>
+	<li>erasing is permanent (undo not available)</li>
+	<li>affects all doodles under the mouse</li>
+	</ul>
+</details>
+<details>
+<summary>Hold CTRL key to reveal doodle order &amp; change what is erased.</summary>
+	<ul>
+	<li>doodles under mouse and any made since them are hilighted</li>
+	<li>ctrl+click erases all hilighted doodles</li>
+	</ul>
+</details>
+<details>
+<summary>Keyboard focus follows the mouse.</summary>
+	<ul>
+	<li>doodles don't react to any keyboard events</li>
+	<li>keyboard events go to the forms&amp;etc. on the page</li>
+	</ul>
+</details>
+<br>Regardless of whether doodling is on/off:
+<details>
+<summary>Reloading or navigating away from a page erases all its doodles.</summary>
+	<ul>
+	<li>and doodling is toggled off for that page</li>
+	<li>erasing is permanent (undo not available)</li>
+	</ul>
+</details>
+<br><button id="expandAll">Expand All</button>
 </div>
 
+<div id="about">
+<p>I enjoy playing Sudoku online, but it can get a little annoying because each
+site has a slightly different way to interact. On many (but not all) sites you
+can click and then type a number to solve a cell. But there are almost as many
+ways to mark candidates as there are sites with puzzles. And some sites don't
+even support marks! I created this extension to smooth over these differences
+so I don't have to worry as much about which site I'm on and I can instead just
+work on the puzzles.</p>
+<p>I know if I print out the page I can make all those site differences
+completely disappear, and all I need to know is how to use a pencil. I'm sure
+you've guessed by now that this is the inspiration behind this extension. The
+pencil-and-paper interaction is fairly easy to implement, and also easy to
+understand and use. And it should not interfere much at all with most sites.</p>
+<p>There are other extensions that let you doodle. Some even let you share your
+doodles with the world. And there are fully featured drawing programs that run
+in the browser.  Those are fantastic extensions/apps, but they don't feel quite
+right for this task. They make the doodles the important thing when instead it
+should be the puzzle solving.</p>
+<p>I should also point out that there are apps available (not necessarily
+browser based) specifically for solving puzzles. They are also fantastic, but I
+find much more satisfaction from doing all the work myself. So, in keeping with
+the inspiration, this extension helps to solve puzzles as much as
+pencil-and-paper does.</p>
+</div>
+
+<div id="ports">
+<p>The simple way to think of the doodle button is as a toggle, but (of course)
+the reality is slightly more complicated. Some javascript code must be injected
+into a page to allow doodling, but it would be a waste to do that work for all
+the pages that never get doodled upon. So the first time you press the doodle
+button is 
+</div>
+
+<div id="tweak">
+<textarea id="inject"></textarea>
+</div>
+
+</div>
+</body>

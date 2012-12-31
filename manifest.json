@@ -1,18 +1,18 @@
 
 {
-"name": "Doodle",
-"version": "0.1",
-"description": "Doodle on stuff.",
-"manifest_version": 2,
+"name": "Doodledoku",
+"version": "1",
+"description": "Doodle on web pages, even pages with Sudoku puzzles. See the 'Options' page for more info...",
 "icons": {
     "16": "pencil-16.png",
     "48": "pencil-48.png",
     "128": "pencil-128.png" },
-"permissions": [ "tabs", "<all_urls>" ],
 "background": { "page": "background.html" },
+"options_page": "options.html",
 "browser_action": {
 	"default_icon": "pencil-16.png",
 	"default_title": "Toggle Doodle" },
-"options_page": "options.html"
+"permissions": [ "tabs", "<all_urls>" ],
+"manifest_version": 2
 }
 

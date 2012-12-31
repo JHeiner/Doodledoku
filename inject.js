@@ -1,17 +1,18 @@
 
 if (document.body.nodeName != "FRAMESET") {
 
-var baseRadius = 2;
-var pickRadius = baseRadius+2;
+var baseRadius = 1.5;
+var pickRadius = baseRadius+3;
 var thicknesses = [baseRadius,baseRadius*2,pickRadius,pickRadius*2];
 var normalColor = "#333";
-var hiliteColor = "#f88";
+var eraserColor = "#E9B";
 
 var svgNS = "http://www.w3.org/2000/svg";
 
 var svg = document.createElementNS(svgNS,"svg");
 svg.setAttribute("preserveAspectRatio","none");
 svg.setAttribute("zoomAndPan","disable");
+svg.setAttribute("pointer-events","none");
 svg.setAttribute("cursor","crosshair"); // cool: affected by pointer-events
 svg.style.position = "absolute";
 svg.style.zIndex = 999999999;
@@ -28,6 +29,12 @@ svg.setAttribute("stroke-linejoin","round");
 svg.setAttribute("stroke-linecap","round");
 document.body.appendChild(svg);
 
+var eraserRect = document.createElementNS(svgNS,"rect");
+eraserRect.setAttribute("fill","none");
+eraserRect.setAttribute("stroke",eraserColor);
+eraserRect.setAttribute("stroke-dasharray","5,3,5,2");
+svg.appendChild(eraserRect);
+
 function shapeAllResize(circleRadius,pathWidth) {
 	for ( var shape = svg.firstChild ; shape ; shape = shape.nextSibling )
 		switch ( shape.nodeName ) {
@@ -41,51 +48,44 @@ function shapeListColor(shape,color) {
 		case "path": shape.setAttribute("stroke",color); } }
 
 var pressed = false; // is the primary mouse button down?
+var ctrlKey = false; // was the control key down when mouse pressed?
 var doodle = null; // the path currently being drawn
 var lastX = 0; var lastY = 0; // pageX,pageY of last doodle point
 
 // keyboard events don't have mouse position (needed for elementFromPoint)
 var clientX = 0; var clientY = 0; // so stash them here in all mouse events
 
-function shapeFindHilite() {
-	var found = [];
-	shapeAllResize(thicknesses[2],thicknesses[3]);
-	for ( var hit = document.elementFromPoint(clientX,clientY)
-	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(clientX,clientY) ) {
-		for ( var i = found.length - 1 ; i >= 0 ; -- i )
-			if (hit == found[i]) {
-				console.error("duplicate (pointer-events fails)");
-				return; }
-		found.push(hit);
-		hit.setAttribute("pointer-events","none"); }
-	for ( var i = found.length - 1 ; i >= 0 ; -- i )
-		found[i].removeAttribute("pointer-events");
-	shapeAllResize(thicknesses[0],thicknesses[1]);
-	if (found.length == 0) {
-		shapeListColor(svg.firstChild,normalColor);
-		return; }
-	var shape = svg.firstChild;
-	while ( shape && found.indexOf(shape) == -1 )
-		shape = shape.nextSibling;
-	if (!shape) console.error("zero hits found???"); else
-	shapeListColor(shape,hiliteColor); }
-
 function downMouse(event) {
 	clientX = event.clientX; clientY = event.clientY;
-	if (0 != event.button) return;
-	if (pressed || doodle) { console.error("lost mouseup?"); doodle = null; }
 	lastX = event.pageX; lastY = event.pageY;
-	pressed = true; event.preventDefault(); }
+console.info("d="+(clientX-lastX)+","+(clientY-lastY));
+	if (0 != event.button) return;
+	if (doodle) console.error("existing doodle");
+	event.preventDefault();
+	pressed = true;
+	ctrlKey = event.ctrlKey;
+	doodle = null;
+	eraserRect.setAttribute("x",lastX);
+	eraserRect.setAttribute("y",lastY);
+	eraserRect.setAttribute("width",0);
+	eraserRect.setAttribute("height",0); }
 
 function moveMouse(event) {
 	clientX = event.clientX; clientY = event.clientY;
+	var deltaX = event.pageX - lastX; var deltaY = event.pageY - lastY;
+	lastX = event.pageX; lastY = event.pageY;
 	if (!pressed) {
 		if (event.ctrlKey) shapeFindHilite();
 		return; }
 	event.preventDefault();
-	var deltaX = event.pageX - lastX; var deltaY = event.pageY - lastY;
 	if (deltaX*deltaX + deltaY*deltaY < 17) return;
+	if (ctrlKey) {
+		var w = lastX-eraserRect.getAttribute("x");
+		var h = lastY-eraserRect.getAttribute("y");
+		console.info("w="+w+", h="+h);
+		eraserRect.setAttribute("width",w);
+		eraserRect.setAttribute("height",h);
+		return; }
 	if (doodle)
 		doodle.setAttribute("d",doodle.getAttribute("d")
 		                    + " "+deltaX+","+deltaY);
@@ -96,11 +96,11 @@ function moveMouse(event) {
 		doodle.setAttribute("stroke-width",thicknesses[1]);
 		doodle.setAttribute("stroke",normalColor);
 		doodle.setAttribute("fill","none");
-		svg.appendChild(doodle); }
-	lastX = event.pageX; lastY = event.pageY; }
+		svg.appendChild(doodle); } }
 
 function upMouse(event) {
 	moveMouse(event);
+console.info("d="+(clientX-lastX)+","+(clientY-lastY));
 	if (0 != event.button) return;
 	event.preventDefault();
 	if (!pressed) console.error("lost mousedown?"); pressed = false;
@@ -125,6 +125,30 @@ function upMouse(event) {
 	dot.setAttribute("stroke","none");
 	svg.appendChild(dot); }
 
+function shapeFindHilite() {
+	var found = [];
+	shapeAllResize(thicknesses[2],thicknesses[3]);
+	for ( var hit = document.elementFromPoint(clientX,clientY)
+	      ; hit && hit.parentNode == svg
+	      ; hit = document.elementFromPoint(clientX,clientY) ) {
+		for ( var i = found.length - 1 ; i >= 0 ; -- i )
+			if (hit == found[i]) {
+				console.error("duplicate (pointer-events fails)");
+				return; }
+		found.push(hit);
+		hit.setAttribute("pointer-events","none"); }
+	for ( var i = found.length - 1 ; i >= 0 ; -- i )
+		found[i].removeAttribute("pointer-events");
+	shapeAllResize(thicknesses[0],thicknesses[1]);
+	if (found.length == 0) {
+		shapeListColor(svg.firstChild,normalColor);
+		return; }
+	var shape = svg.firstChild;
+	while ( shape && found.indexOf(shape) == -1 )
+		shape = shape.nextSibling;
+	if (!shape) console.error("zero hits found???"); else
+	shapeListColor(shape,eraserColor); }
+
 var focusX; var focusY; var focusOn;
 function focusToMouse() {
 	if (focusX == clientX && focusY == clientY ) return;
@@ -135,7 +159,7 @@ function focusToMouse() {
 	if (!hit || hit == focusOn) return;
 	hit = focusTest( hit );
 	if (hit) focusOn = hit; }
-var focusTest = function(hit) {
+function focusTest(hit) {
 	switch (hit.nodeName) {
 	case "INPUT": case "BUTTON": case "SELECT": case "TEXTAREA":
 		hit.focus(); return hit; }

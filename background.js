@@ -1,10 +1,10 @@
 
 var injected = { allFrames: true, file: "inject.js" };
 
-var greenish = { color: "#0D0" };
-var grayish = { color: "#AAA" };
+var greenish = { color: "#0F0" };
+var blackish = { color: "#333" };
 function notifyState(active) {
-	chrome.browserAction.setBadgeBackgroundColor(active?greenish:grayish); }
+	chrome.browserAction.setBadgeBackgroundColor(active?greenish:blackish); }
 function notifyCount(count) {
 	chrome.browserAction.setBadgeText({text:(count?""+count:"")}); }
 
@@ -19,28 +19,33 @@ function notifyTabState(tabId) {
 	var found = tabHash[tabId];
 	notifyState( (!found) ? false : found.isActive ); }
 
+function registerTab(tabId,active) {
+	return (tabHash[tabId] = {
+		isActive: active,
+		ports: [],
+		toggle: function() {
+			if (this.isActive) {
+				this.ports.forEach(sendDetach);
+				notifyState(this.isActive = false); }
+			else {
+				this.ports.forEach(sendAttach);
+				notifyState(this.isActive = true); } },
+		destroy: function() {
+			notifyCount( portCount -= this.ports.length );
+			this.ports.forEach(disconnect);
+			delete tabHash[tabId];
+			notifyState(false); } }); }
+
 chrome.browserAction.onClicked.addListener(function(tab) {
 	var found = tabHash[tab.id];
 	if (found) found.toggle(); else {
-		tabHash[tab.id] = {
-			isActive: true,
-			ports: [],
-			toggle: function() {
-				if (this.isActive) {
-					this.ports.forEach(sendDetach);
-					notifyState(this.isActive = false); }
-				else {
-					this.ports.forEach(sendAttach);
-					notifyState(this.isActive = true); } },
-			destroy: function() {
-				notifyCount( portCount -= this.ports.length );
-				this.ports.forEach(disconnect);
-				delete tabHash[tab.id];
-				notifyState(false); } };
+		registerTab(tab.id,true);
 		chrome.tabs.executeScript(tab.id,injected); } });
 
 chrome.extension.onConnect.addListener(function(port) {
 	var found = tabHash[port.sender.tab.id];
+	if (!found)
+		found = registerTab(port.sender.tab.id,false);
 	if (!found) {
 		console.error("no hash entry for tab "+port.sender.tab.id);
 		port.disconnect(); }
