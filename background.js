@@ -1,9 +1,10 @@
 
-var xhr = new XMLHttpRequest();
-xhr.open("GET", chrome.extension.getURL("/inject.js"), false);
-xhr.send();
-if (xhr.readyState != 4) console.error(xhr);
-var inject = xhr.responseText;
+var request = new XMLHttpRequest();
+request.open("GET", chrome.extension.getURL("inject.js"), false);
+request.send();
+if (request.readyState != 4) console.error(request);
+var inject = request.responseText;
+request = null;
 
 var greenish = { color: "#0F0" };
 var blackish = { color: "#333" };

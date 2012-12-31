@@ -8,8 +8,8 @@ svg.setAttribute("pointer-events","none");
 svg.setAttribute("cursor","crosshair"); // cool: affected by pointer-events
 svg.style.position = "absolute";
 svg.style.zIndex = 999999999;
-svg.style.top = 0; // origin at absolute 0,0 means that clientX and
-svg.style.left = 0; // pageX are same, as are clientY and pageY
+svg.style.top = 0;
+svg.style.left = 0;
 svg.setAttribute("stroke-linejoin","round");
 svg.setAttribute("stroke-linecap","round");
 svg.setAttribute("stroke","none");
@@ -61,32 +61,32 @@ function rubberErase() {
 
 var mouseXY = {
 	lastX: -1, lastY: -1, prevX: -1, prevY: -1,
+	clientX: -1, clientY: -1,
 	downX: -1, downY: -1, path: null,
-	focusX: -1, focusY: -1, input: null };
+	focusX: -1, focusY: -1, focused: null };
 
 mouseXY.down = function() {
 	this.downX = this.lastX; this.downY = this.lastY; }
 
 function focusTest(hit) {
-	switch (hit.nodeName) {
-	case "INPUT": case "BUTTON": case "SELECT": case "TEXTAREA":
-		hit.focus(); return hit; }
-	return null; }
+	if (!("focus" in hit)) return null;
+	if (typeof hit.focus !== "function") return null;
+	hit.focus(); return hit; }
 mouseXY.focus = function() {
-	if (this.focusX==this.lastX && this.focusY==this.lastY) return;
-	this.focusX = this.lastX; this.focusY = this.lastY;
+	if (this.focusX==this.clientX && this.focusY==this.clientY) return;
+	this.focusX = this.clientX; this.focusY = this.clientY;
 	svg.setAttribute("pointer-events","none");
 	var hit = document.elementFromPoint(this.focusX,this.focusY);
 	svg.setAttribute("pointer-events","visiblePainted");
-	if (!hit || hit == this.input) return;
+	if (!hit || hit == this.focused) return;
 	hit = focusTest( hit );
-	if (hit) this.input = hit; }
+	if (hit) this.focused = hit; }
 
 mouseXY.erase = function(subsequentSiblings) {
 	var found = false; allShapes(pickRadius);
-	for ( var hit = document.elementFromPoint(this.lastX,this.lastY)
+	for ( var hit = document.elementFromPoint(this.clientX,this.clientY)
 	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(this.lastX,this.lastY) ) {
+	      ; hit = document.elementFromPoint(this.clientX,this.clientY) ) {
 		if (subsequentSiblings) while (svg.lastChild != hit)
 			svg.removeChild(svg.lastChild);
 		svg.removeChild(hit); found = true; }
@@ -120,11 +120,11 @@ mouseXY.pathEnd = function() {
 
 mouseXY.hilite = function() {
 	allShapes(pickRadius);
-	for ( var hit = document.elementFromPoint(this.lastX,this.lastY)
+	for ( var hit = document.elementFromPoint(this.clientX,this.clientY)
 	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(this.lastX,this.lastY) ) {
+	      ; hit = document.elementFromPoint(this.clientX,this.clientY) ) {
 		hit.setAttribute("pointer-events","none");
-		hit.hit = true; found = true; }
+		hit.hit = true; }
 	var found = false; var shape = svg.firstChild.nextSibling;
 	for ( ; shape ; shape = shape.nextSibling ) {
 		oneShape(shape,baseRadius);
@@ -147,13 +147,11 @@ function State(name,mouse,ctrl) {
 	this.name = name; this.mouse = mouse; this.ctrl = ctrl; }
 State.prototype.enter = function() {}
 State.prototype.leave = function() {}
-State.prototype.missingTransition = function(input) {
-	console.error("missingTransition:"+this.name+"."+input); }
-State.prototype.mousemove = function() { this.missingTransition("mousemove"); }
-State.prototype.mousedown = function() { this.missingTransition("mousedown"); }
-State.prototype.mouseup = function() { this.missingTransition("mouseup"); }
-State.prototype.ctrldown = function() { this.missingTransition("ctrldown"); }
-State.prototype.ctrlup = function() { this.missingTransition("ctrlup"); }
+State.prototype.mousemove = function() {}
+State.prototype.mousedown = function() {}
+State.prototype.mouseup = function() {}
+State.prototype.ctrldown = function() {}
+State.prototype.ctrlup = function() {}
 
 var idleState = new State("idle",false,false);
 var pressedState = new State("pressed",true,false);
@@ -166,16 +164,15 @@ var cancelState = new State("cancel",true,false);
 var theState = idleState;
 
 State.prototype.go = function() {
-	//console.log(theState.name+"->"+this.name);
 	theState.leave(); this.enter(); theState = this; }
 
 mouseXY.move = function(event) {
 	if (this.lastX==event.pageX && this.lastY==event.pageY) return;
 	this.prevX = this.lastX; this.lastX = event.pageX;
 	this.prevY = this.lastY; this.lastY = event.pageY;
+	this.clientX = event.clientX; this.clientY = event.clientY;
 	theState.mousemove(); }
 
-idleState.mousemove = function() {}
 idleState.mousedown = function() { pressedState.go(); }
 idleState.ctrldown = function() { hilitingState.go(); }
 
@@ -207,7 +204,6 @@ rubberState.leave = function() { allShapes(normalColor); rubberSet(-1,-1,0,0); }
 rubberState.mouseup = function() { rubberErase(); hilitingState.go(); }
 rubberState.ctrlup = function() { cancelState.go(); }
 
-cancelState.mousemove = function() {}
 cancelState.mouseup = function() { idleState.go(); }
 cancelState.ctrldown = function() { mouseXY.down(); erasingState.go(); }
 
@@ -228,7 +224,10 @@ function upMouse(event) {
 	theState.mouseup(); }
 
 function focusToMouse(event) {
-	mouseXY.focus(); }
+	var was = mouseXY.focused;
+	mouseXY.focus();
+	if (mouseXY.focused != was)
+console.log(mouseXY.lastX+","+mouseXY.lastY+" - "+mouseXY.clientX+","+mouseXY.clientY); }
 
 function downKey(event) {
 	if (event.keyCode == 17/*ctrl*/)
