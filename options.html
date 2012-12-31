@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <head>
 <title>Doodledoku Help &amp; Options</title>
-<link rel=stylesheet href="lib/css/black-tie/jquery-ui-1.8.22.custom.css"/>
+<link rel=stylesheet href="lib/css/black-tie/jquery-ui-1.8.22.custom.css">
 <script src="lib/js/jquery-1.7.2.js"></script>
 <script src="lib/js/jquery-ui-1.8.22.custom.min.js"></script>
+<script src="codemirror-2.34/lib/codemirror.js"></script>
+<link rel=stylesheet href="codemirror-2.34/lib/codemirror.css">
+<script src="codemirror-2.34/mode/javascript/javascript.js"></script>
 <style>
 	#quick summary, #quick ul, #quick li { margin: 8px; }
 	p { line-height: 150%; }
+	.CodeMirror-scroll { height: auto; overflow-y: hidden; overflow-x: auto; }
+
 </style>
 <script src="options.js"></script>
 </head>
 <body style="background:#eee;padding:10px; min-width: 682px;">
-<div id="banner" style="padding: 15px 15px 15px 25px;">
-<svg width="512" height="128" style="fill:none;stroke:black;stroke-width:7;stroke-linecap:square">
+<div id=banner style="padding: 15px 15px 15px 25px;">
+<svg width=512 height=128 style="fill:none;stroke:black;stroke-width:7;stroke-linecap:square">
 <path d="m 27,14 0,5 -1,4 -1,4 -1,4 -1,4 -1,4 -2,5 -1,6 -1,4 -1,4 -1,5 -1,5 0,5 -1,4 -1,5 0,5 -1,4 -1,4 0,5 -1,4 -1,4 -2,4"/>
 <path d="m 25,6 6,0 4,1 5,0 6,0 4,1 5,0 5,0 5,1 4,1 5,1 4,1 5,1 4,1 4,2 4,3 4,3 3,3 2,4 2,4 1,4 2,4 1,4 2,4 1,4 1,4 0,5 0,5 -1,4 -2,4 -1,4 -1,4 -2,4 -3,4 -2,4 -3,4 -3,3 -4,3 -4,3 -5,3 -3,3 -4,2 -4,2 -4,2 -4,1 -4,1 -6,1 -5,0 -5,0 -5,0 -4,-1 -4,-1 -6,-1 -5,0 -5,0 -5,-1 -6,0"/>
 <path d="m 169,59 -5,0 -4,-1 -5,0 -5,0 -4,2 -4,1 -4,2 -4,3 -2,4 -2,4 -2,4 -1,4 -2,5 -1,5 -1,4 0,6 3,4 4,3 4,2 4,2 6,0 5,1 5,0 4,1 5,0 5,0 4,-1 4,-1 4,-1 5,-1 4,-2 3,-3 3,-3 3,-4 0,-5 -1,-4 -3,-4 -3,-4 -3,-3 -3,-3 -3,-3 -3,-3 -3,-3 -4,-3 -3,-3"/>
@@ -22,17 +27,17 @@
 <path d="m 410,6 -2,4 -1,5 -1,4 -1,5 -1,4 -1,4 -1,4 0,5 -2,4 -1,4 -1,4 -1,6 -1,4 0,5 -1,4 -1,4 0,6 -1,4 0,6 0,5 0,5 0,5 0,5 -1,4 -1,4"/>
 <path d="m 426,92 7,0 6,0 5,0 6,0 5,0 5,0 5,0 5,0 5,0 4,-2 4,-2 1,-5 -3,-4 -3,-3 -3,-3 -4,-2 -4,-2 -5,-1 -4,-1 -5,-1 -5,0 -5,0 -5,-1 -5,0 -4,1 -4,2 -4,3 -2,4 -1,4 -1,4 -1,4 0,6 1,5 1,4 3,4 3,4 3,3 4,2 4,1 5,1 5,1 6,0 6,0 5,-1 6,0 5,0 6,0 4,1 5,0 4,1 5,1 4,2 4,1 4,2"/>
 </svg><img src="pencil-128.png"></div>
-<div id="contents">
+<div id=contents>
 <ul>
-<li><a href="#quick">Quick</a></li>
-<li><a href="#about">Why</a></li>
-<li><a href="#ports">Toggle</a></li>
-<li><a href="#tweak">Options</a></li>
+<li><a href=#quick>Quick</a></li>
+<li><a href=#about>Why</a></li>
+<li><a href=#ports>Toggle</a></li>
+<li><a href=#tweak>Options</a></li>
 </ul>
 
-<div id="quick">
+<div id=quick>
 <details>
-<summary>Click the little pencil button (up near the wrench) to toggle doodling on/off.</summary>
+<summary>Click the little pencil button (right of the omnibox) to toggle doodling on/off.</summary>
 	<ul>
 	<li>green box means doodling is on, black means it is off</li>
 	<li>toggle doodling off to mouse the links&amp;etc. on the page</li>
@@ -76,10 +81,10 @@
 	<li>erasing is permanent (undo not available)</li>
 	</ul>
 </details>
-<br><button id="expandAll">Expand All</button>
+<br><button id=expandAll>Expand All</button>
 </div>
 
-<div id="about">
+<div id=about>
 <p>I enjoy playing Sudoku online, but it can get a little annoying because each
 site has a slightly different way to interact. On many (but not all) sites you
 can click and then type a number to solve a cell. But there are almost as many
@@ -104,7 +109,7 @@ the inspiration, this extension helps to solve puzzles as much as
 pencil-and-paper does.</p>
 </div>
 
-<div id="ports">
+<div id=ports>
 <p>The simple way to think of the doodle button is as a toggle, but (of course)
 the reality is slightly more complicated. Some javascript code must be injected
 into a page to allow doodling, but it would be a waste to do that work for all
@@ -112,8 +117,7 @@ the pages that never get doodled upon. So the first time you press the doodle
 button is 
 </div>
 
-<div id="tweak">
-<textarea id="inject"></textarea>
+<div id=tweak>
 </div>
 
 </div>

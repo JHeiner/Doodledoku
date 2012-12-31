@@ -1,5 +1,9 @@
 
-var injected = { allFrames: true, file: "inject.js" };
+var xhr = new XMLHttpRequest();
+xhr.open("GET", chrome.extension.getURL("/inject.js"), false);
+xhr.send();
+if (xhr.readyState != 4) console.error(xhr);
+var inject = xhr.responseText;
 
 var greenish = { color: "#0F0" };
 var blackish = { color: "#333" };
@@ -40,7 +44,11 @@ chrome.browserAction.onClicked.addListener(function(tab) {
 	var found = tabHash[tab.id];
 	if (found) found.toggle(); else {
 		registerTab(tab.id,true);
-		chrome.tabs.executeScript(tab.id,injected); } });
+		var code = localStorage.Options;
+		if (!code) code = "";
+		code = "if (document.body.nodeName != 'FRAMESET') {\n"
+			+inject+"\n"+code+"\n}";
+		chrome.tabs.executeScript(tab.id,{allFrames:true,code:code}); } });
 
 chrome.extension.onConnect.addListener(function(port) {
 	var found = tabHash[port.sender.tab.id];

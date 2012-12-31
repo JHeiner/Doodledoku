@@ -1,12 +1,4 @@
 
-if (document.body.nodeName != "FRAMESET") {
-
-var baseRadius = 1.5;
-var pickRadius = baseRadius+3;
-var thicknesses = [baseRadius,baseRadius*2,pickRadius,pickRadius*2];
-var normalColor = "#333";
-var eraserColor = "#E9B";
-
 var svgNS = "http://www.w3.org/2000/svg";
 
 var svg = document.createElementNS(svgNS,"svg");
@@ -16,8 +8,236 @@ svg.setAttribute("pointer-events","none");
 svg.setAttribute("cursor","crosshair"); // cool: affected by pointer-events
 svg.style.position = "absolute";
 svg.style.zIndex = 999999999;
-svg.style.top = 0;
-svg.style.left = 0;
+svg.style.top = 0; // origin at absolute 0,0 means that clientX and
+svg.style.left = 0; // pageX are same, as are clientY and pageY
+svg.setAttribute("stroke-linejoin","round");
+svg.setAttribute("stroke-linecap","round");
+svg.setAttribute("stroke","none");
+svg.setAttribute("fill","none");
+document.body.appendChild(svg);
+
+var baseRadius = {
+	circle: function(c) { c.setAttribute("r",1.5); },
+	path: function(p) { p.setAttribute("stroke-width",3); } };
+var pickRadius = {
+	circle: function(c) { c.hit = false; c.setAttribute("r",4.5); },
+	path: function(p) { p.hit = false; p.setAttribute("stroke-width",6); } };
+
+var normalColor = {
+	circle: function(c) { c.setAttribute("fill","#333"); },
+	path: function(p) { p.setAttribute("stroke","#333"); } };
+var eraserColor = {
+	circle: function(c) { c.setAttribute("fill","#E9B"); },
+	path: function(p) { p.setAttribute("stroke","#E9B"); } };
+
+function oneShape(shape,actionMap) {
+	var action = actionMap[shape.nodeName];
+	if (action) action(shape); }
+function someShapes(shape,actionMap) {
+	for ( ; shape ; shape = shape.nextSibling )
+		oneShape(shape,actionMap); }
+function allShapes(actionMap) {
+	someShapes(svg.firstChild.nextSibling,actionMap); }
+
+var rubberRect = document.createElementNS(svgNS,"rect");
+rubberRect.setAttribute("stroke","#E9B");
+rubberRect.setAttribute("stroke-dasharray","5");
+rubberRect.setAttribute("pointer-events","none");
+svg.appendChild(rubberRect);
+
+var rubberArea = svg.createSVGRect();
+function rubberSet(x,y,w,h) {
+	rubberRect.setAttribute("x",rubberArea.x=x);
+	rubberRect.setAttribute("y",rubberArea.y=y);
+	rubberRect.setAttribute("width",rubberArea.width=w);
+	rubberRect.setAttribute("height",rubberArea.height=h); }
+rubberSet(-1,-1,0,0);
+
+function rubberErase() {
+	var shapes = svg.getEnclosureList(rubberArea,svg);
+	for ( index = shapes.length - 1 ; index >= 0 ; --index )
+		svg.removeChild(shapes[index]);
+	allShapes(normalColor); }
+
+var mouseXY = {
+	lastX: -1, lastY: -1, prevX: -1, prevY: -1,
+	downX: -1, downY: -1, path: null,
+	focusX: -1, focusY: -1, input: null };
+
+mouseXY.down = function() {
+	this.downX = this.lastX; this.downY = this.lastY; }
+
+function focusTest(hit) {
+	switch (hit.nodeName) {
+	case "INPUT": case "BUTTON": case "SELECT": case "TEXTAREA":
+		hit.focus(); return hit; }
+	return null; }
+mouseXY.focus = function() {
+	if (this.focusX==this.lastX && this.focusY==this.lastY) return;
+	this.focusX = this.lastX; this.focusY = this.lastY;
+	svg.setAttribute("pointer-events","none");
+	var hit = document.elementFromPoint(this.focusX,this.focusY);
+	svg.setAttribute("pointer-events","visiblePainted");
+	if (!hit || hit == this.input) return;
+	hit = focusTest( hit );
+	if (hit) this.input = hit; }
+
+mouseXY.erase = function(subsequentSiblings) {
+	var found = false; allShapes(pickRadius);
+	for ( var hit = document.elementFromPoint(this.lastX,this.lastY)
+	      ; hit && hit.parentNode == svg
+	      ; hit = document.elementFromPoint(this.lastX,this.lastY) ) {
+		if (subsequentSiblings) while (svg.lastChild != hit)
+			svg.removeChild(svg.lastChild);
+		svg.removeChild(hit); found = true; }
+	allShapes(baseRadius); return found; }
+
+mouseXY.eraseElseDot = function() {
+	if (this.erase(false)) return;
+	var c = document.createElementNS(svgNS,"circle");
+	c.setAttribute("cx",this.lastX);
+	c.setAttribute("cy",this.lastY);
+	baseRadius.circle(c);
+	normalColor.circle(c);
+	svg.appendChild(c); }
+
+mouseXY.pathMore = function() {
+	var d = this.path.getAttribute("d")
+	    + " "+(this.lastX-this.prevX)+","+(this.lastY-this.prevY);
+	this.path.setAttribute("d",d); }
+
+mouseXY.pathStart = function() {
+	var p = document.createElementNS(svgNS,"path");
+	p.setAttribute("d","m "+this.downX+","+this.downY);
+	baseRadius.path(p);
+	normalColor.path(p);
+	svg.appendChild(p);
+	this.path = p;
+	this.pathMore(); }
+
+mouseXY.pathEnd = function() {
+	this.path = null; }
+
+mouseXY.hilite = function() {
+	allShapes(pickRadius);
+	for ( var hit = document.elementFromPoint(this.lastX,this.lastY)
+	      ; hit && hit.parentNode == svg
+	      ; hit = document.elementFromPoint(this.lastX,this.lastY) ) {
+		hit.setAttribute("pointer-events","none");
+		hit.hit = true; found = true; }
+	var found = false; var shape = svg.firstChild.nextSibling;
+	for ( ; shape ; shape = shape.nextSibling ) {
+		oneShape(shape,baseRadius);
+		if (shape.hit) {
+			shape.removeAttribute("pointer-events");
+			found = true; }
+		oneShape(shape,found ? eraserColor : normalColor); } }
+
+mouseXY.rubber = function() {
+	rubberSet(Math.min(this.downX,this.lastX),
+	          Math.min(this.downY,this.lastY),
+	          Math.abs(this.lastX-this.downX),
+	          Math.abs(this.lastY-this.downY));
+	allShapes(normalColor);
+	var shapes = svg.getEnclosureList(rubberArea,svg);
+	for ( index = shapes.length - 1 ; index >= 0 ; --index )
+		oneShape(shapes[index],eraserColor); }
+
+function State(name,mouse,ctrl) {
+	this.name = name; this.mouse = mouse; this.ctrl = ctrl; }
+State.prototype.enter = function() {}
+State.prototype.leave = function() {}
+State.prototype.missingTransition = function(input) {
+	console.error("missingTransition:"+this.name+"."+input); }
+State.prototype.mousemove = function() { this.missingTransition("mousemove"); }
+State.prototype.mousedown = function() { this.missingTransition("mousedown"); }
+State.prototype.mouseup = function() { this.missingTransition("mouseup"); }
+State.prototype.ctrldown = function() { this.missingTransition("ctrldown"); }
+State.prototype.ctrlup = function() { this.missingTransition("ctrlup"); }
+
+var idleState = new State("idle",false,false);
+var pressedState = new State("pressed",true,false);
+var drawingState = new State("drawing",true,false);
+var hilitingState = new State("hiliting",false,true);
+var erasingState = new State("erasing",true,true);
+var rubberState = new State("rubber",true,true);
+var cancelState = new State("cancel",true,false);
+
+var theState = idleState;
+
+State.prototype.go = function() {
+	//console.log(theState.name+"->"+this.name);
+	theState.leave(); this.enter(); theState = this; }
+
+mouseXY.move = function(event) {
+	if (this.lastX==event.pageX && this.lastY==event.pageY) return;
+	this.prevX = this.lastX; this.lastX = event.pageX;
+	this.prevY = this.lastY; this.lastY = event.pageY;
+	theState.mousemove(); }
+
+idleState.mousemove = function() {}
+idleState.mousedown = function() { pressedState.go(); }
+idleState.ctrldown = function() { hilitingState.go(); }
+
+pressedState.mousemove = function() { drawingState.go(); }
+pressedState.mouseup = function() { mouseXY.eraseElseDot(); idleState.go(); }
+pressedState.ctrldown = function() { erasingState.go(); }
+
+drawingState.enter = function() { mouseXY.pathStart(); }
+drawingState.mousemove = function() { mouseXY.pathMore(); }
+drawingState.leave = function() { mouseXY.pathEnd(); }
+drawingState.mouseup = function() { idleState.go(); }
+drawingState.ctrldown = function() { mouseXY.down(); erasingState.go(); }
+
+hilitingState.enter = function() { mouseXY.hilite(); }
+hilitingState.mousemove = function() { mouseXY.hilite(); }
+hilitingState.leave = function() { allShapes(normalColor); }
+hilitingState.ctrlup = function() { idleState.go(); }
+hilitingState.mousedown = function() { erasingState.go(); }
+
+erasingState.enter = function() { mouseXY.hilite(); }
+erasingState.mousemove = function() { rubberState.go(); }
+erasingState.leave = function() { allShapes(normalColor); }
+erasingState.mouseup = function() { mouseXY.erase(true); hilitingState.go(); }
+erasingState.ctrlup = function() { pressedState.go(); }
+
+rubberState.enter = function() { mouseXY.rubber(); }
+rubberState.mousemove = function() { mouseXY.rubber(); }
+rubberState.leave = function() { allShapes(normalColor); rubberSet(-1,-1,0,0); }
+rubberState.mouseup = function() { rubberErase(); hilitingState.go(); }
+rubberState.ctrlup = function() { cancelState.go(); }
+
+cancelState.mousemove = function() {}
+cancelState.mouseup = function() { idleState.go(); }
+cancelState.ctrldown = function() { mouseXY.down(); erasingState.go(); }
+
+function downMouse(event) {
+	mouseXY.move(event);
+	if (0 != event.button) return;
+	event.preventDefault();
+	mouseXY.down();
+	theState.mousedown(); }
+
+function moveMouse(event) {
+	mouseXY.move(event); }
+
+function upMouse(event) {
+	mouseXY.move(event);
+	if (0 != event.button) return;
+	event.preventDefault();
+	theState.mouseup(); }
+
+function focusToMouse(event) {
+	mouseXY.focus(); }
+
+function downKey(event) {
+	if (event.keyCode == 17/*ctrl*/)
+		theState.ctrldown(); }
+
+function upKey(event) {
+	if (event.keyCode == 17/*ctrl*/)
+		theState.ctrlup(); }
+
 function svgResize() {
 	// todo? stretch doodles in clever ways?
 	svg.style.width = 0; svg.style.height = 0;
@@ -25,153 +245,6 @@ function svgResize() {
 	svg.style.height = document.body.scrollHeight; }
 window.addEventListener("resize",svgResize);
 svgResize();
-svg.setAttribute("stroke-linejoin","round");
-svg.setAttribute("stroke-linecap","round");
-document.body.appendChild(svg);
-
-var eraserRect = document.createElementNS(svgNS,"rect");
-eraserRect.setAttribute("fill","none");
-eraserRect.setAttribute("stroke",eraserColor);
-eraserRect.setAttribute("stroke-dasharray","5,3,5,2");
-svg.appendChild(eraserRect);
-
-function shapeAllResize(circleRadius,pathWidth) {
-	for ( var shape = svg.firstChild ; shape ; shape = shape.nextSibling )
-		switch ( shape.nodeName ) {
-		case "circle": shape.setAttribute("r",circleRadius); break;
-		case "path": shape.setAttribute("stroke-width",pathWidth); } }
-
-function shapeListColor(shape,color) {
-	for ( ; shape ; shape = shape.nextSibling )
-		switch ( shape.nodeName ) {
-		case "circle": shape.setAttribute("fill",color); break;
-		case "path": shape.setAttribute("stroke",color); } }
-
-var pressed = false; // is the primary mouse button down?
-var ctrlKey = false; // was the control key down when mouse pressed?
-var doodle = null; // the path currently being drawn
-var lastX = 0; var lastY = 0; // pageX,pageY of last doodle point
-
-// keyboard events don't have mouse position (needed for elementFromPoint)
-var clientX = 0; var clientY = 0; // so stash them here in all mouse events
-
-function downMouse(event) {
-	clientX = event.clientX; clientY = event.clientY;
-	lastX = event.pageX; lastY = event.pageY;
-console.info("d="+(clientX-lastX)+","+(clientY-lastY));
-	if (0 != event.button) return;
-	if (doodle) console.error("existing doodle");
-	event.preventDefault();
-	pressed = true;
-	ctrlKey = event.ctrlKey;
-	doodle = null;
-	eraserRect.setAttribute("x",lastX);
-	eraserRect.setAttribute("y",lastY);
-	eraserRect.setAttribute("width",0);
-	eraserRect.setAttribute("height",0); }
-
-function moveMouse(event) {
-	clientX = event.clientX; clientY = event.clientY;
-	var deltaX = event.pageX - lastX; var deltaY = event.pageY - lastY;
-	lastX = event.pageX; lastY = event.pageY;
-	if (!pressed) {
-		if (event.ctrlKey) shapeFindHilite();
-		return; }
-	event.preventDefault();
-	if (deltaX*deltaX + deltaY*deltaY < 17) return;
-	if (ctrlKey) {
-		var w = lastX-eraserRect.getAttribute("x");
-		var h = lastY-eraserRect.getAttribute("y");
-		console.info("w="+w+", h="+h);
-		eraserRect.setAttribute("width",w);
-		eraserRect.setAttribute("height",h);
-		return; }
-	if (doodle)
-		doodle.setAttribute("d",doodle.getAttribute("d")
-		                    + " "+deltaX+","+deltaY);
-	else {
-		doodle = document.createElementNS(svgNS,"path");
-		doodle.setAttribute("d","m "+lastX+","+lastY
-		                    + " "+deltaX+","+deltaY);
-		doodle.setAttribute("stroke-width",thicknesses[1]);
-		doodle.setAttribute("stroke",normalColor);
-		doodle.setAttribute("fill","none");
-		svg.appendChild(doodle); } }
-
-function upMouse(event) {
-	moveMouse(event);
-console.info("d="+(clientX-lastX)+","+(clientY-lastY));
-	if (0 != event.button) return;
-	event.preventDefault();
-	if (!pressed) console.error("lost mousedown?"); pressed = false;
-	if (doodle) { doodle = null; return; }
-	// svg.getIntersectionList is bounding-box based, hence useless
-	// don't require precision clicks to erase
-	var found = false;
-	shapeAllResize(thicknesses[2],thicknesses[3]);
-	for ( var hit = document.elementFromPoint(clientX,clientY)
-	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(clientX,clientY) ) {
-		if (event.ctrlKey) while (svg.lastChild != hit)
-			svg.removeChild(svg.lastChild);
-		svg.removeChild(hit); found = true; }
-	shapeAllResize(thicknesses[0],thicknesses[1]);
-	if (found) return;
-	var dot = document.createElementNS(svgNS,"circle");
-	dot.setAttribute("r",thicknesses[0]);
-	dot.setAttribute("cx",lastX);
-	dot.setAttribute("cy",lastY);
- 	dot.setAttribute("fill",normalColor);
-	dot.setAttribute("stroke","none");
-	svg.appendChild(dot); }
-
-function shapeFindHilite() {
-	var found = [];
-	shapeAllResize(thicknesses[2],thicknesses[3]);
-	for ( var hit = document.elementFromPoint(clientX,clientY)
-	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(clientX,clientY) ) {
-		for ( var i = found.length - 1 ; i >= 0 ; -- i )
-			if (hit == found[i]) {
-				console.error("duplicate (pointer-events fails)");
-				return; }
-		found.push(hit);
-		hit.setAttribute("pointer-events","none"); }
-	for ( var i = found.length - 1 ; i >= 0 ; -- i )
-		found[i].removeAttribute("pointer-events");
-	shapeAllResize(thicknesses[0],thicknesses[1]);
-	if (found.length == 0) {
-		shapeListColor(svg.firstChild,normalColor);
-		return; }
-	var shape = svg.firstChild;
-	while ( shape && found.indexOf(shape) == -1 )
-		shape = shape.nextSibling;
-	if (!shape) console.error("zero hits found???"); else
-	shapeListColor(shape,eraserColor); }
-
-var focusX; var focusY; var focusOn;
-function focusToMouse() {
-	if (focusX == clientX && focusY == clientY ) return;
-	focusX = clientX; focusY = clientY;
-	svg.setAttribute("pointer-events","none");
-	var hit = document.elementFromPoint(focusX,focusY);
-	svg.setAttribute("pointer-events","visiblePainted");
-	if (!hit || hit == focusOn) return;
-	hit = focusTest( hit );
-	if (hit) focusOn = hit; }
-function focusTest(hit) {
-	switch (hit.nodeName) {
-	case "INPUT": case "BUTTON": case "SELECT": case "TEXTAREA":
-		hit.focus(); return hit; }
-	return null; }
-
-function downKey(event) {
-	if (event.keyCode == 17/*ctrl*/)
-		shapeFindHilite(); }
-
-function upKey(event) {
-	if (event.keyCode == 17/*ctrl*/)
-		shapeListColor(svg.firstChild,normalColor); }
 
 // communication with the extension
 
@@ -206,92 +279,4 @@ function detachListeners() { if (isActive) {
 	window.removeEventListener("keydown",downKey);
 	window.removeEventListener("keyup",upKey);
 	isActive = false; }}
-
-// ---------------------
-
-if (/^http:\/\/www\.puzzlemix\.com\/playgrid/.test(document.documentURI)) {
-
-	var clicks = []; var select = /^select_cell\((\d+)\)$/;
-	var lefts = [null,"12%","32%","52%","12%","32%","52%","12%","32%","52%"];
-	var tops =  [null,"55%","55%","55%","33%","33%","33%","11%","11%","11%"];
-
-	for ( var cell = document.getElementById("gridcontainer").firstChild
-	      ; cell ; cell = cell.nextSibling )
-		if (cell.nodeType == 1/*element*/)
-	{
-		var click = select.exec(cell.getAttribute("onclick"));
-		if (!click) continue;
-
-		var index = Number(click[1]);
-		if (!clicks[index]) clicks[index] = cell.onclick;
-		else cell.onclick = clicks[index];
-
-		for ( var part = cell.firstChild ; part ; part = part.nextSibling )
-			if (part.nodeType == 1)
-		{
-			if (part.onclick) {
-				console.error(part);
-				alert("Unexpected click handler (see console)."); }
-			part.onclick = cell.onclick;
-			if ("numbcell" != part.getAttribute("class")) continue;
-			index = Number(part.textContent);
-			if (lefts[index]) part.style.left = lefts[index];
-			if (tops[index]) part.style.top = tops[index];
-		}			
-	}
-	var focusClick; var original = focusTest;
-	focusTest = function(hit) {
-		//console.log(hit);
-		if (original(hit)) {
-			//console.log("=input");
-			hit.click(); return null; }
-		var click = hit.onclick;
-		if (!click) {
-			//console.log("=noclick");
-			return null; }
-		if (click == focusClick) {
-			//console.log("=already");
-			return hit; }
-		if (-1 != clicks.indexOf(click)) {
-			//console.log("=new:"+click);
-			focusClick = click; click(); return hit; }
-		//console.log("=unknown:"+click);
-		return null; }
-	var keypressed = document.body.onkeydown;
-	var keyDown32 = document.createEvent("KeyboardEvent");
-	var keyCode32 = { get: function() { return 32; }};
-	Object.defineProperty(keyDown32,'keyCode',keyCode32);
-	Object.defineProperty(keyDown32,'which',keyCode32);
-	keyDown32.initKeyboardEvent("keydown",true, true,null,
-		false,false,false,false,32,32);
-	document.body.onkeydown = function(event) {
-		keypressed((event.keyCode == 107/*numpad+*/) ? keyDown32 : event); } }
-
-else
-if (/^http:\/\/www\.sudoku\.org\.uk\/Puzzles/.test(document.documentURI)) {
-/*
-for <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000">s
-  var param = document.createElement('param');
-    param.setAttribute('name','wmode');
-    param.setAttribute('value','opaque');
-    obj.appendChild(param);
-  var wrapper = document.createElement('div');
-    obj.parentNode.replaceChild(wrapper,obj.parentNode);
-	wrapper.appendChild(obj)
-*/
-	var embeds = document.getElementsByTagName("EMBED")
-	for (var i = embeds.length - 1 ; i >= 0 ; --i ) {
-		if (embeds[i].getAttribute("type")=="application/x-shockwave-flash") {
-			embeds[i].setAttribute("wmode","opaque");
-			var parent = embeds[i].parentElement;
-			if (parent.nodeName == "OBJECT")
-				parent.parentNode.replaceChild(embeds[i],parent); } }
-	window.addEventListener("keydown",function(event) {
-		switch (event.keyCode) {
-		case 107/*numpad+*/: case 27/*esc*/:
-			port.postMessage("toggle");
-			event.preventDefault(); } });
- }
-
-} // if not frameset
 
