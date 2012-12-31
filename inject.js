@@ -1,6 +1,8 @@
 // Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
 // See LICENSE file for info.
 
+if (document.body.nodeName != 'FRAMESET') {
+
 var svgNS = "http://www.w3.org/2000/svg";
 
 var svg = document.createElementNS(svgNS,"svg");
@@ -293,3 +295,4 @@ function detachListeners() { if (isActive) {
 	window.removeEventListener("keyup",upKey);
 	isActive = false; }}
 
+} // if not FRAMESET
