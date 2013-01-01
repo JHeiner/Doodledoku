@@ -1,5 +1,5 @@
-// Copyright © 2012, Jeremy Heiner (github.com/JHeiner). All rights reserved.
-// See LICENSE file for info.
+// Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
+// All rights reserved. See LICENSE file for info.
 
 if (document.body.nodeName != 'FRAMESET') {
 
