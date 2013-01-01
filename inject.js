@@ -188,6 +188,8 @@ State.prototype.go = function() {
 	theState.leave(); this.enter(); theState = this; }
 
 mouseXY.move = function(event) {
+	if (event.ctrlKey) { if (!theState.ctrl) theState.ctrldown(); }
+	else /*!event.ctl*/{ if (theState.ctrl) theState.ctrlup(); }
 	if (this.lastX==event.pageX && this.lastY==event.pageY) return;
 	this.prevX = this.lastX; this.lastX = event.pageX;
 	this.prevY = this.lastY; this.lastY = event.pageY;
@@ -236,6 +238,11 @@ function downMouse(event) {
 	theState.mousedown(); }
 
 function moveMouse(event) {
+	if (theState.mouse && event.which != 1) {
+		var ctrl = theState.ctrl
+		if (ctrl) theState.ctrlup();
+		theState.mouseup();
+		if (ctrl) theState.ctrldown(); }
 	mouseXY.move(event); }
 
 function upMouse(event) {

@@ -13,6 +13,7 @@ All rights reserved. See LICENSE file for info. -->
 	summary, details ul, details li { margin:8px; }
 	p { line-height:150%; margin: 5px 0 10px 0; }
 	kbd { border: solid grey 1px; padding: 0 2px; background:white; }
+	.diff ul { margin-top: 0; }
 	.CodeMirror-scroll { height:auto; overflow-y:hidden; overflow-x:auto; }
 </style>
 <script src="options.js"></script>
@@ -165,21 +166,27 @@ href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdf
 </div>
 
 <div id=diffs>
-In version:
-<p>5 <small><i>(2013-01-01)</i></small><ul>
+<p>In version:</p>
+<div class=diff>5 <small><i>(2013-01-01)</i></small><ul>
     <li>Use the new <a
 	href="http://developer.chrome.com/extensions/event_pages.html"
-	>event pages</a> feature.</li>
-    <li>Show tab count on icon (was frame count).</li></ul></p>
-<p>4 <small><i>(2012-11-05)</i></small>
-	Fixed bug just introduced in click-to-erase.</p>
-<p>3 <small><i>(2012-11-05)</i></small><ul>
-    <li>Allow a tiny bit of movement in click-to-erase.</li>
-    <li>Updated help (Flash player, bug reports, changes page).</li></ul></p>
-<p>2 <small><i>(2012-10-16)</i></small>
-	Fixed some typos in the help.</p>
-<p>1 <small><i>(2012-10-16)</i></small>
-	First upload (never made public).</p>
+	>event pages</a> feature.
+    <li>Show tab count on icon (was frame count).
+    <li>Attempt to recover when a mouseup event gets lost.
+</ul></div>
+<div class=diff>4 <small><i>(2012-11-05)</i></small><ul>
+    <li>Fixed bug just introduced in click-to-erase.
+</ul></div>
+<div class=diff>3 <small><i>(2012-11-05)</i></small><ul>
+    <li>Allow a tiny bit of movement in click-to-erase.
+    <li>Updated help (Flash player, bug reports, changes page).
+</ul></div>
+<div class=diff>2 <small><i>(2012-10-16)</i></small><ul>
+    <li>Fixed some typos in the help.
+</ul></div>
+<div class=diff>1 <small><i>(2012-10-16)</i></small><ul>
+    <li>First upload (never made public).
+</ul></div>
 </div>
 
 <div id=tweak>
