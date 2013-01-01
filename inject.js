@@ -16,8 +16,8 @@ svg.style.top = 0;
 svg.style.left = 0;
 svg.setAttribute("stroke-linejoin","round");
 svg.setAttribute("stroke-linecap","round");
-svg.setAttribute("stroke","none");
-svg.setAttribute("fill","none");
+svg.setAttribute("stroke","#333");
+svg.setAttribute("fill","#333");
 document.body.appendChild(svg);
 
 var baseRadius = {
@@ -28,8 +28,8 @@ var pickRadius = {
 	path: function(p) { p.hit = false; p.setAttribute("stroke-width",6); } };
 
 var normalColor = {
-	circle: function(c) { c.setAttribute("fill","#333"); },
-	path: function(p) { p.setAttribute("stroke","#333"); } };
+	circle: function(c) { c.setAttribute("fill","inherit"); },
+	path: function(p) { p.setAttribute("stroke","inherit"); } };
 var eraserColor = {
 	circle: function(c) { c.setAttribute("fill","#E9B"); },
 	path: function(p) { p.setAttribute("stroke","#E9B"); } };
@@ -44,6 +44,7 @@ function allShapes(actionMap) {
 	someShapes(svg.firstChild.nextSibling,actionMap); }
 
 var rubberRect = document.createElementNS(svgNS,"rect");
+rubberRect.setAttribute("fill","none");
 rubberRect.setAttribute("stroke","#E9B");
 rubberRect.setAttribute("stroke-dasharray","5");
 rubberRect.setAttribute("pointer-events","none");
@@ -101,6 +102,7 @@ mouseXY.eraseElseDot = function() {
 	var c = document.createElementNS(svgNS,"circle");
 	c.setAttribute("cx",this.lastX);
 	c.setAttribute("cy",this.lastY);
+	c.setAttribute("stroke","none");
 	baseRadius.circle(c);
 	normalColor.circle(c);
 	svg.appendChild(c); }
@@ -115,6 +117,7 @@ mouseXY.pathMore = function() {
 mouseXY.pathStart = function() {
 	var p = document.createElementNS(svgNS,"path");
 	p.setAttribute("d","m "+this.downX+","+this.downY);
+	p.setAttribute("fill","none");
 	baseRadius.path(p);
 	normalColor.path(p);
 	svg.appendChild(p);
