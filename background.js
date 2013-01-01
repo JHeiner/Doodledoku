@@ -22,7 +22,7 @@ function sendAttach(port) { port.postMessage("attach"); }
 function sendDetach(port) { port.postMessage("detach"); }
 function disconnect(port) { port.disconnect(); }
 
-var tabHash = {}; var portCount = 0; var listening = false;
+var tabHash = {}; var tabCount = 0; var listening = false;
 notifyState(false); notifyCount(0);
 
 function notifyTabState(tabId) {
@@ -31,7 +31,7 @@ function notifyTabState(tabId) {
 
 function TabInfo(tabId,isActive) {
 	this.tabId = tabId; this.isActive = isActive; this.ports = [];
-	tabHash[tabId] = this; }
+	tabHash[tabId] = this; notifyCount(++tabCount); }
 
 TabInfo.prototype.toggle = function() {
 	if (this.isActive) {
@@ -42,7 +42,7 @@ TabInfo.prototype.toggle = function() {
 		notifyState(this.isActive = true); } }
 
 TabInfo.prototype.destroy = function() {
-	notifyCount( portCount -= this.ports.length );
+	notifyCount(--tabCount);
 	this.ports.forEach(disconnect);
 	delete tabHash[this.tabId];
 	notifyState(false); }
@@ -52,14 +52,15 @@ var inject = { allFrames: true, file: "inject.js" }
 chrome.browserAction.onClicked.addListener(function(tab) {
 	var found = tabHash[tab.id];
 	if (found) found.toggle(); else {
-		new TabInfo(tab.id,true);
+		var info = new TabInfo(tab.id,true);
 		chrome.tabs.executeScript(tab.id,inject,function(results) {
-			var code = localStorage.Options;
-			if (code) {
-				code = { allFrames: true, code:
-					"if (document.body.nodeName != 'FRAMESET') {\n"
-					+code+"\n}" };
-				chrome.tabs.executeScript(tab.id,code); } }); } });
+			if (!results) info.destroy(); else {
+				var code = localStorage.Options;
+				if (code) {
+					code = { allFrames: true, code:
+						"if (document.body.nodeName != 'FRAMESET') {\n"
+						+code+"\n}" };
+					chrome.tabs.executeScript(tab.id,code); } } }); } });
 
 chrome.extension.onConnect.addListener(function(port) {
 	var tabId = port.sender.tab.id;
@@ -67,7 +68,7 @@ chrome.extension.onConnect.addListener(function(port) {
 	if (!found) // the options page connects when opened
 		found = new TabInfo(tabId,false);
 	if (found.isActive) { sendAttach(port); notifyState(true); }
-	found.ports.push(port); notifyCount(++portCount);
+	found.ports.push(port);
 	port.onDisconnect.addListener(function() {found.destroy()});
 	port.onMessage.addListener(function(message) {
 		if (message=="toggle") found.toggle(); }); });
