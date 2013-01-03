@@ -6,15 +6,17 @@ All rights reserved. See LICENSE file for info. -->
 <script src="jquery-1.8.2/jquery.min.js"></script>
 <link rel=stylesheet href="jquery-ui-1.8.24/black-tie.css">
 <script src="jquery-ui-1.8.24/jquery-ui.js"></script>
-<script src="codemirror-2.34/codemirror.js"></script>
-<link rel=stylesheet href="codemirror-2.34/codemirror.css">
-<script src="codemirror-2.34/javascript.js"></script>
+<script src="codemirror-3.0/codemirror.js"></script>
+<link rel=stylesheet href="codemirror-3.0/codemirror.css">
+<script src="codemirror-3.0/javascript.js"></script>
+<script src="codemirror-3.0/matchbrackets.js"></script>
 <style>
 	summary, details ul, details li { margin:8px; }
 	p { line-height:150%; margin: 5px 0 10px 0; }
 	kbd { border: solid grey 1px; padding: 0 2px; background:white; }
 	.diff ul { margin-top: 0; }
-	.CodeMirror-scroll { height:auto; overflow-y:hidden; overflow-x:auto; }
+	.CodeMirror { height:auto; }
+	.CodeMirror-scroll { overflow-y:hidden; overflow-x:auto; }
 </style>
 <script src="options.js"></script>
 </head>
@@ -167,6 +169,9 @@ href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdf
 
 <div id=diffs>
 <p>In version:</p>
+<div class=diff>6 <small><i>(2013-01-01)</i></small><ul>
+    <li>Disabled event pages (manifest rejected when loaded from Web Store).
+</ul></div>
 <div class=diff>5 <small><i>(2013-01-01)</i></small><ul>
     <li>Use the new <a
 	href="http://developer.chrome.com/extensions/event_pages.html"
