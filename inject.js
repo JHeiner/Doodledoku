@@ -305,4 +305,7 @@ function detachListeners() { if (isActive) {
 	window.removeEventListener("keyup",upKey);
 	isActive = false; }}
 
+if (typeof injectionFinished == "function")
+	injectionFinished();
+
 } // if not FRAMESET

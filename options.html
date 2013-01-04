@@ -169,6 +169,13 @@ href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdf
 
 <div id=diffs>
 <p>In version:</p>
+<div class=diff>7 <small><i>(2013-01-0?)</i></small><ul>
+    <li>Use the new <a
+	href="http://developer.chrome.com/extensions/storage.html"
+	>storage</a> APIs (which work with <a
+	href="https://support.google.com/chromeos/bin/answer.py?hl=en&topic=2586013&answer=165139"
+	>Chrome sync</a>).
+</div>
 <div class=diff>6 <small><i>(2013-01-01)</i></small><ul>
     <li>Disabled event pages (manifest rejected when loaded from Web Store).
 </ul></div>
@@ -195,6 +202,15 @@ href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdf
 </div>
 
 <div id=tweak>
+<p id=syncInfo>Sync'ed: <small><i>(none)</i></small></p>
+<table><tr><td>
+<button id=editCode>&downarrow;
+Overwrite Local with Sync'ed and edit Local</button>
+</td></tr><tr><td>
+<button id=pushCode disabled>&uparrow;
+Push Local out as the new Sync'ed version</button>
+</td></tr></table>
+<p id=localInfo>Local: <small><i>(none)</i></small></p>
 </div>
 
 </div>
