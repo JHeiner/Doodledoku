@@ -115,7 +115,11 @@ if (document.location.hostname == 'www.example.com') {\n\
 
 $(function () {
 
-	var $tabs = $("#contents").tabs();
+	var $tabs = $("#contents").tabs({
+		activate: function(event,ui) {
+			if (ui.newPanel[0].id != "tweak") return;
+			var mirror = editor.mirror;
+			if (mirror) mirror.refresh(); } });
 
 	var inject = document.createElement("script");
 	inject.setAttribute("src","inject.js");
@@ -139,15 +143,11 @@ $(function () {
 			if (syncCode != localCode)
 				storage.sync = (!localCode) ? null : local; }); });
 
-	$tabs.bind('tabsshow',function(event,ui) {
-		if (ui.panel.id!="tweak") return;
-		storage.changed = storageChanged;
-		storage.read( storageChanged );
-		$(this).unbind(event); });
-
 	storage.read(function(local,sync) {
+		storage.changed = storageChanged;
+		storageChanged(local,sync);
 		if (("code" in local) || ("code" in sync))
-			$tabs.tabs('select','#tweak'); });
+			$tabs.tabs('option','active',-1); });
 
 });
 
