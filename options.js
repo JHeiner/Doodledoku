@@ -1,8 +1,9 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
 // All rights reserved. See LICENSE file for info.
 
-function injectionFinished() {
-	port.postMessage("toggle"); }
+"use strict";
+
+var doodledoku = function(self) { self.toggle(); };
 
 var storage = (function() {
 	var local = undefined; var sync = undefined; var waiters = [];

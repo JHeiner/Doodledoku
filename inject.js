@@ -1,7 +1,9 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
 // All rights reserved. See LICENSE file for info.
 
-if (document.body.nodeName != 'FRAMESET') {
+"use strict";
+
+window.Doodledoku = function() {
 
 var svgNS = "http://www.w3.org/2000/svg";
 
@@ -305,7 +307,21 @@ function detachListeners() { if (isActive) {
 	window.removeEventListener("keyup",upKey);
 	isActive = false; }}
 
-if (typeof injectionFinished == "function")
-	injectionFinished();
+var my = {
+	get svg() {return svg},
+	get state() {return theState.name},
+	get port() {return port},
+	get active() {return isActive},
+	toggle: function() { port.postMessage("toggle"); }
+	};
 
-} // if not FRAMESET
+if ("doodledoku" in window)
+	if ("function" == typeof window.doodledoku)
+		window.doodledoku(my);
+
+return my;
+}
+if (document.body.nodeName != 'FRAMESET')
+	window.doodledoku = window.Doodledoku();
+delete window.Doodledoku;
+

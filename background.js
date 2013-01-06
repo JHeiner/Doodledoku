@@ -1,6 +1,8 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
 // All rights reserved. See LICENSE file for info.
 
+"use strict";
+
 var greenish = { color: "#0F0" };
 var blackish = { color: "#333" };
 function notifyState(active) {

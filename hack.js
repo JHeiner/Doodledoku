@@ -1,6 +1,10 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
 // All rights reserved. See LICENSE file for info.
 
+"use strict";
+
+var doodledoku = function(self) { self.toggle(); };
+
 $(function () {
 
 	var inject = document.createElement("script");
