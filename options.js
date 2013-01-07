@@ -3,8 +3,6 @@
 
 "use strict";
 
-var doodledoku = function(self) { self.toggle(); };
-
 var storage = (function() {
 	var local = undefined; var sync = undefined; var waiters = [];
 	function isEmpty(value) {

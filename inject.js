@@ -3,7 +3,7 @@
 
 "use strict";
 
-window.Doodledoku = function() {
+window.doodledoku = function() {
 
 var svgNS = "http://www.w3.org/2000/svg";
 
@@ -275,20 +275,16 @@ svgResize();
 
 // communication with the extension
 
-var port = chrome.extension.connect({name:document.documentURI});
+var port = chrome.extension.connect();
 
 port.onDisconnect.addListener(function() {
 	detachListeners();
 	window.removeEventListener("resize",svgResize);
-	document.body.removeChild(svg); });
+	document.body.removeChild(svg);
+	svg = undefined; port = undefined; });
 
-port.onMessage.addListener(function(message) {
-	switch (message) {
-		case "attach": attachListeners(); break;
-		case "detach": detachListeners(); break; } });
-
-var isActive = false;
-function attachListeners() { if (!isActive) {
+var doodling = false;
+function attachListeners() { if (!doodling) {
 	svg.setAttribute("pointer-events","visiblePainted");
 	svg.addEventListener("mousedown",downMouse);
 	svg.addEventListener("mousemove",moveMouse);
@@ -296,8 +292,8 @@ function attachListeners() { if (!isActive) {
 	window.addEventListener("keydown",focusToMouse,true);
 	window.addEventListener("keydown",downKey);
 	window.addEventListener("keyup",upKey);
-	isActive = true; }}
-function detachListeners() { if (isActive) {
+	doodling = true; }}
+function detachListeners() { if (doodling) {
 	svg.setAttribute("pointer-events","none");
 	svg.removeEventListener("mousedown",downMouse);
 	svg.removeEventListener("mousemove",moveMouse);
@@ -305,23 +301,25 @@ function detachListeners() { if (isActive) {
 	window.removeEventListener("keydown",focusToMouse,true);
 	window.removeEventListener("keydown",downKey);
 	window.removeEventListener("keyup",upKey);
-	isActive = false; }}
+	doodling = false; }}
 
-var my = {
+port.onMessage.addListener(function(message) {
+	switch (message) {
+		case "attach": attachListeners(); break;
+		case "detach": detachListeners(); break; } });
+
+return {
 	get svg() {return svg},
 	get state() {return theState.name},
 	get port() {return port},
-	get active() {return isActive},
+	get doodling() {return doodling},
 	toggle: function() { port.postMessage("toggle"); }
 	};
-
-if ("doodledoku" in window)
-	if ("function" == typeof window.doodledoku)
-		window.doodledoku(my);
-
-return my;
 }
-if (document.body.nodeName != 'FRAMESET')
-	window.doodledoku = window.Doodledoku();
-delete window.Doodledoku;
+if (document.body.nodeName == 'FRAMESET')
+	delete window.doodledoku;
+else
+	window.doodledoku = window.doodledoku();
+
+"OK";
 

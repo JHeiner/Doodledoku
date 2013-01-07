@@ -3,29 +3,6 @@
 
 "use strict";
 
-var greenish = { color: "#0F0" };
-var blackish = { color: "#333" };
-function notifyState(active) {
-	chrome.browserAction.setBadgeBackgroundColor(active?greenish:blackish); }
-
-var listening = false;
-function notifyCount(count) {
-	chrome.browserAction.setBadgeText({text:(count?""+count:"")});
-	if (count == 0) {
-		if (listening) {
-			chrome.tabs.onActivated.removeListener(tabActivated)
-			chrome.windows.onFocusChanged.removeListener(windowFocused);
-			listening = false; } }
-	else { // count != 0
-		if (!listening) {
-			chrome.tabs.onActivated.addListener(tabActivated)
-			chrome.windows.onFocusChanged.addListener(windowFocused);
-			listening = true; } } }
-
-function sendAttach(port) { port.postMessage("attach"); }
-function sendDetach(port) { port.postMessage("detach"); }
-function disconnect(port) { port.disconnect(); }
-
 var storage = (function() {
 	var local = undefined; var sync = undefined; var waiters = [];
 	function isEmpty(value) {
@@ -36,11 +13,13 @@ var storage = (function() {
 	function set(storage,value) {
 		if (isEmpty(value)) storage.clear(); else storage.set(value); }
 	var my = {
+		// these three are for debugging use only
 		get local() { return local; },
-		set local(x) { set(chrome.storage.local,x); },
 		get sync() { return sync; },
-		set sync(x) { set(chrome.storage.sync,x); },
-		get waiters() { return (!waiters) ? 0 : waiters.length; } };
+		get waiters() { return (!waiters) ? 0 : waiters.length; },
+		// the rest are for "real" use...
+		set local(x) { set(chrome.storage.local,x); },
+		set sync(x) { set(chrome.storage.sync,x); } };
 	function changed() {
 		if ((!local) || (!sync)) return;
 		if ("changed" in my) my.changed(local,sync);
@@ -49,15 +28,16 @@ var storage = (function() {
 			(waiters.pop())(local,sync);
 		waiters = undefined; }
 	function localListener(items) {
-		local = items ? items : {}; changed(); }
+		local = (!items) ? {} : items; changed(); }
 	function syncListener(items) {
-		sync = items ? items : {}; changed(); }
+		sync = (!items) ? {} : items; changed(); }
 	function changeListener(delta,area) {
 		if (area == "local") chrome.storage.local.get(null,localListener);
 		else if (area == "sync") chrome.storage.sync.get(null,syncListener); }
 	chrome.storage.onChanged.addListener(changeListener);
 	changeListener(null,"local");
 	changeListener(null,"sync");
+	// read might return old values, use changed to get notifications
 	my.read = function(waiter) {
 		if (!waiters) waiter(local,sync);
 		else waiters.push(waiter); }
@@ -74,73 +54,143 @@ storage.changed = function(local,sync) {
 	else {
 		localStorage.clear();
 		delete storage.changed;
-		var time = new Date().toISOString();
-		chrome.storage.local.set({ time: time, code: old }); } }
+		var now = new Date().toISOString();
+		storage.local = { time: now, code: old }; } }
 
-var tabHash = {}; var tabCount = 0;
+var badge = (function(){
+	var my = undefined;
+	var trueColor = { color: "#0F0" };
+	var falseColor = { color: "#333" };
+	function notifyState(state) {
+		var color = (!state) ? falseColor : trueColor;
+		chrome.browserAction.setBadgeBackgroundColor(color); }
+	var lastFocused = chrome.windows.WINDOW_ID_NONE;
+	function tabActivated(info) {
+		if (info.windowId == lastFocused)
+			notifyState(my.getState(info.tabId)); }
+	function windowFocused(winId) {
+		if (winId == chrome.windows.WINDOW_ID_NONE) return;
+		lastFocused = winId;
+		chrome.tabs.query( { active:true, windowId:winId }, function(tabs) {
+			if (tabs.length != 1) console.error("weird tabs.query:",tabs);
+			else notifyState(my.getState(tabs[0].id)); }); }
+	var listening = false;
+	function notifyCount(count) {
+		chrome.browserAction.setBadgeText({text:(count?""+count:"")});
+		if (count == 0) {
+			if (listening) {
+				chrome.tabs.onActivated.removeListener(tabActivated)
+				chrome.windows.onFocusChanged.removeListener(windowFocused);
+				listening = false; }
+			notifyState(false); }
+		else { // count != 0
+			if (!listening) {
+				chrome.tabs.onActivated.addListener(tabActivated)
+				chrome.windows.onFocusChanged.addListener(windowFocused);
+				listening = true; }
+			chrome.windows.getLastFocused(function(window) {
+				windowFocused(window.id); }); } }
+	var count = 0; notifyCount(0);
+	my = { // you must define getState(tabId)
+		get trueColor() { return trueColor.color; },
+		set trueColor(x) { trueColor.color = x; },
+		get falseColor() { return falseColor.color; },
+		set falseColor(x) { falseColor.color = x; },
+		get lastFocused() { return lastFocused; },
+		get listening() { return listening; },
+		get count() { return count; } };
+	my.increment = function() {
+		if (-1 == count) throw new RangeError("how did you manage this?");
+		notifyCount( ++count ); }
+	my.decrement = function() {
+		if (0 == count) throw new RangeError("decrement from zero?");
+		notifyCount( --count ); }
+	my.update = function() {
+		windowFocused(lastFocused); }
+	return my; })();
 
-function TabInfo(tabId) {
-	this.tabId = tabId; this.isActive = true; this.ports = [];
-	tabHash[tabId] = this; notifyState(true); notifyCount(++tabCount); }
+var tabHash = {};
 
-TabInfo.prototype.toggle = function() {
-	if (this.isActive) {
-		this.ports.forEach(sendDetach);
-		notifyState(this.isActive = false); }
-	else {
-		this.ports.forEach(sendAttach);
-		notifyState(this.isActive = true); } }
+function TabInfo(tab) {
+	this.tab = tab; this.doodling = false; this.ports = [];
+	tabHash[tab.id] = this; badge.increment();
+	this.allFrames = false; }
+
+badge.getState = function(tabId) {
+	var found = tabHash[tabId];
+	return (!found) ? false : found.doodling; }
 
 TabInfo.prototype.destroy = function() {
-	notifyCount(--tabCount);
-	this.ports.forEach(disconnect);
-	this.ports = [];
-	delete tabHash[this.tabId];
-	notifyState(false); }
+	this.ports.forEach(function(port){port.disconnect();});
+	this.ports = undefined;
+	delete tabHash[this.tab.id]; badge.decrement(); }
+
+TabInfo.prototype.toggle = function() {
+	if (this.doodling) {
+		this.ports.forEach(function(port){port.postMessage("detach");});
+		this.doodling = false;
+		badge.update(); }
+	else {
+		this.ports.forEach(function(port){port.postMessage("attach");});
+		this.doodling = true;
+		badge.update(); } }
 
 TabInfo.prototype.dispatch = function(message) {
 	if (message == "toggle") this.toggle();
 	else console.error("dispatch:"+message); }
 
 TabInfo.prototype.addPort = function(port) {
-	if (this.isActive) { sendAttach(port); notifyState(true); }
 	port.onDisconnect.addListener(this.destroy.bind(this));
 	port.onMessage.addListener(this.dispatch.bind(this));
-	this.ports.push(port);
-	if (this.ports.length == 1 ) // allFrames
-		storage.read(this.sendCode.bind(this)); }
+	this.ports.push(port); }
 
-TabInfo.prototype.sendCode = function(local,sync) {
-	if ("code" in local) this.execCode(local.code);
-	else if ("code" in sync) this.execCode(sync.code); }
-
-TabInfo.prototype.execCode = function(code) {
-	chrome.tabs.executeScript(this.tabId, { allFrames: true, code:
-		"if (document.body.nodeName != 'FRAMESET') {\n"
-		+code+"\n}" }); }
-
-var inject = { allFrames: true, file: "inject.js" }
+TabInfo.prototype.executeScript = function(details,callback) {
+	if (this.allFrames) details.allFrames = true;
+	chrome.tabs.executeScript(this.tab.id,details,
+		(!callback)?null:this[callback].bind(this) ); }
 
 chrome.browserAction.onClicked.addListener(function(tab) {
 	var found = tabHash[tab.id];
 	if (found) found.toggle();
-	else chrome.tabs.executeScript(tab.id,inject); });
+	else new TabInfo(tab).inject(); });
+
+TabInfo.prototype.inject = function() {
+	this.toggle = function(){ alert("tab contacted, awaiting reply"); };
+	this.executeScript({code:"document.body.nodeName"},"bodyNodeName"); }
+
+TabInfo.prototype.bodyNodeName = function(results) {
+	if ( !Array.isArray(results) || results.length != 1 ) {
+		console.error("weird results:",results);
+		return; }
+	if ('FRAMESET' == results[0])
+		this.allFrames = true;
+	else if ('BODY' != results[0]) {
+		console.error("weird results:",results);
+		return; }
+	this.executeScript({file:"inject.js"},"injected"); }
+
+TabInfo.prototype.injected = function(results) {
+	if ( !Array.isArray(results) || results.length <= 0 ) {
+		console.error("weird results:",results);
+		return; }
+	for ( var i = results.length - 1 ; 0 <= i ; --i )
+		if (results[0] != "OK") {
+			console.error("weird results:",results);
+			return; }
+	delete this.toggle;
+	this.toggle();
+	storage.read(this.sendOptions.bind(this)); }
+
+TabInfo.prototype.sendOptions = function(local,sync) {
+	var options = ("code" in local) ? local.code
+		: ("code" in sync) ? sync.code : null;
+	if (!options) return;
+	options = "if ('doodledoku' in window) {\n"+options+"\n}";
+	this.executeScript({code:options},null); }
 
 chrome.extension.onConnect.addListener(function(port) {
-	var tabId = port.sender.tab.id;
-	var found = tabHash[tabId];
-	if (!found) found = new TabInfo(tabId);
+	var tab = port.sender.tab;
+	var found = tabHash[tab.id];
+	if (!found) found = new TabInfo(tab);
 	found.addPort(port); });
-
-function notifyTabState(tabId) {
-	var found = tabHash[tabId];
-	notifyState( (!found) ? false : found.isActive ); }
-
-function tabActivated(info) {
-	notifyTabState(info.tabId); }
-
-function windowFocused(winId) { if (winId != -1)
-	chrome.tabs.query( { active:true, windowId:winId }, function(tabs) {
-		if (tabs.length != 1) console.error(tabs);
-		else notifyTabState(tabs[0].id); }); }
 
