@@ -1,7 +1,7 @@
 
 {
 "name": "Doodledoku",
-"version": "9",
+"version": "9.1",
 "minimum_chrome_version": "22",
 "description": "Doodle on web pages, even pages with Sudoku puzzles!",
 "icons": {

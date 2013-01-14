@@ -3,24 +3,67 @@
 
 "use strict";
 
-window.doodledoku = function() {
+function Doodle(svg)
+{
 
-var svgNS = "http://www.w3.org/2000/svg";
+var doodle = this;
+var svgNS = 'http://www.w3.org/2000/svg';
 
-var svg = document.createElementNS(svgNS,"svg");
-svg.setAttribute("preserveAspectRatio","none");
-svg.setAttribute("zoomAndPan","disable");
+if (svg.nodeName != 'svg')
+	throw new Error("argument must an <svg> element");
+if (svg.namespaceURI != svgNS)
+	throw new Error("svg element isn't in the svg namespace");
+
+var undoCTM = svg.ownerDocument.createElementNS(svgNS,"g");
+function offsetFarthest(ctm) {
+	var x = 0; var y = 0;
+	for ( var e = svg ; e ; e = e.offsetParent ) {
+		x -= e.offsetLeft; y -= e.offsetTop; }
+	return ctm.translate(x,y); }
+undoCTM.transform.baseVal.initialize(
+	svg.createSVGTransformFromMatrix(offsetFarthest(svg.getCTM().inverse())) );
+svg.appendChild(undoCTM);
+
+svg = svg.ownerDocument.createElementNS(svgNS,"svg");
+svg.setAttribute("width",999999999);
+svg.setAttribute("height",999999999);
+svg.setAttribute("cursor","crosshair");
 svg.setAttribute("pointer-events","none");
-svg.setAttribute("cursor","crosshair"); // cool: affected by pointer-events
-svg.style.position = "absolute";
-svg.style.zIndex = 999999999;
-svg.style.top = 0;
-svg.style.left = 0;
 svg.setAttribute("stroke-linejoin","round");
 svg.setAttribute("stroke-linecap","round");
-svg.setAttribute("stroke","#333");
-svg.setAttribute("fill","#333");
-document.body.appendChild(svg);
+undoCTM.appendChild(svg);
+this.__defineGetter__("svg",function(){return svg});
+
+var input = svg.ownerDocument.createElementNS(svgNS,"rect");
+input.setAttribute("width","100%");
+input.setAttribute("height","100%");
+input.setAttribute("stroke","none");
+input.setAttribute("fill","none");
+input.setAttribute("pointer-events","fill");
+svg.appendChild(input);
+
+var group = svg.ownerDocument.createElementNS(svgNS,"g");
+svg.appendChild(group);
+
+var rubberRect = svg.ownerDocument.createElementNS(svgNS,"rect");
+this.__defineGetter__("rubber",function(){return rubberRect});
+rubberRect.setAttribute("fill","none");
+rubberRect.setAttribute("stroke-dasharray","5");
+rubberRect.setAttribute("pointer-events","none");
+svg.appendChild(rubberRect);
+
+this.color = {
+	get normal() {
+		return svg.getAttribute("stroke"); },
+	set normal(x) {
+		svg.setAttribute("stroke", x);
+		svg.setAttribute("fill", x); },
+	get eraser() {
+		return rubberRect.getAttribute("stroke"); },
+	set eraser(x) {
+		rubberRect.setAttribute("stroke",x); } };
+this.color.normal = "#333";
+this.color.eraser = "#E9B";
 
 var baseRadius = {
 	circle: function(c) { c.setAttribute("r",1.5); },
@@ -33,8 +76,8 @@ var normalColor = {
 	circle: function(c) { c.setAttribute("fill","inherit"); },
 	path: function(p) { p.setAttribute("stroke","inherit"); } };
 var eraserColor = {
-	circle: function(c) { c.setAttribute("fill","#E9B"); },
-	path: function(p) { p.setAttribute("stroke","#E9B"); } };
+	circle: function(c) { c.setAttribute("fill",doodle.color.eraser); },
+	path: function(p) { p.setAttribute("stroke",doodle.color.eraser); } };
 
 function oneShape(shape,actionMap) {
 	var action = actionMap[shape.nodeName];
@@ -43,14 +86,7 @@ function someShapes(shape,actionMap) {
 	for ( ; shape ; shape = shape.nextSibling )
 		oneShape(shape,actionMap); }
 function allShapes(actionMap) {
-	someShapes(svg.firstChild.nextSibling,actionMap); }
-
-var rubberRect = document.createElementNS(svgNS,"rect");
-rubberRect.setAttribute("fill","none");
-rubberRect.setAttribute("stroke","#E9B");
-rubberRect.setAttribute("stroke-dasharray","5");
-rubberRect.setAttribute("pointer-events","none");
-svg.appendChild(rubberRect);
+	someShapes(group.firstChild,actionMap); }
 
 var rubberArea = svg.createSVGRect();
 function rubberSet(x,y,w,h) {
@@ -61,94 +97,90 @@ function rubberSet(x,y,w,h) {
 rubberSet(-1,-1,0,0);
 
 function rubberErase() {
-	var shapes = svg.getEnclosureList(rubberArea,svg);
+	var shapes = svg.getEnclosureList(rubberArea,group);
 	for ( var index = shapes.length - 1 ; index >= 0 ; --index )
-		svg.removeChild(shapes[index]);
+		group.removeChild(shapes[index]);
 	allShapes(normalColor); }
 
 var mouseXY = {
-	lastX: -1, lastY: -1, prevX: -1, prevY: -1,
-	clientX: -1, clientY: -1,
-	downX: -1, downY: -1, path: null,
-	focusX: -1, focusY: -1, focused: null };
+	pageX: -1, pageY: -1, clientX: -1, clientY: -1,
+	downX: -1, downY: -1, path: null };
 
 mouseXY.down = function() {
-	this.downX = this.lastX; this.downY = this.lastY; }
+	this.downX = this.pageX; this.downY = this.pageY; }
 
-function focusTest(hit) {
-	if (!("focus" in hit)) return null;
-	if (typeof hit.focus !== "function") return null;
-	hit.focus(); return hit; }
-mouseXY.focus = function() {
-	if (this.focusX==this.clientX && this.focusY==this.clientY) return;
-	this.focusX = this.clientX; this.focusY = this.clientY;
+mouseXY.hit = function() {
+	return svg.ownerDocument.elementFromPoint(this.clientX,this.clientY); }
+
+this.hit = function() {
 	svg.setAttribute("pointer-events","none");
-	var hit = document.elementFromPoint(this.focusX,this.focusY);
+	var hit = mouseXY.hit();
 	svg.setAttribute("pointer-events","visiblePainted");
-	if (!hit || hit == this.focused) return;
-	hit = focusTest( hit );
-	if (hit) this.focused = hit; }
+	return hit; }
 
 mouseXY.erase = function(subsequentSiblings) {
 	var found = false; allShapes(pickRadius);
-	for ( var hit = document.elementFromPoint(this.clientX,this.clientY)
-	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(this.clientX,this.clientY) ) {
-		if (subsequentSiblings) while (svg.lastChild != hit)
-			svg.removeChild(svg.lastChild);
-		svg.removeChild(hit); found = true; }
+	for ( var hit = this.hit()
+	      ; hit && hit.parentNode == group
+	      ; hit = this.hit() ) {
+		if (subsequentSiblings) while (group.lastChild != hit)
+			group.removeChild(group.lastChild);
+		group.removeChild(hit); found = true; }
 	allShapes(baseRadius); return found; }
 
 mouseXY.eraseElseDot = function() {
 	if (this.erase(false)) return;
-	var c = document.createElementNS(svgNS,"circle");
-	c.setAttribute("cx",this.lastX);
-	c.setAttribute("cy",this.lastY);
+	var c = svg.ownerDocument.createElementNS(svgNS,"circle");
+	c.setAttribute("cx",this.pageX);
+	c.setAttribute("cy",this.pageY);
 	c.setAttribute("stroke","none");
 	baseRadius.circle(c);
 	normalColor.circle(c);
-	svg.appendChild(c); }
+	group.appendChild(c); }
 
 mouseXY.pathMore = function() {
-	var x = this.lastX-this.prevX;
-	var y = this.lastY-this.prevY;
-	if (x != 0 || y != 0)
-		this.path.setAttribute("d", this.path.getAttribute("d")
-			+ " "+x+","+y); }
+	var s = this.path.pathSegList;
+	var p = s.getItem(s.numberOfItems-1);
+	if (p.x != this.pageX || p.y != this.pageY)
+		s.appendItem(
+			this.path.createSVGPathSegLinetoAbs(this.pageX,this.pageY)); }
 
 mouseXY.pathStart = function() {
-	var p = document.createElementNS(svgNS,"path");
-	p.setAttribute("d","m "+this.downX+","+this.downY);
+	var p = svg.ownerDocument.createElementNS(svgNS,"path");
+	p.pathSegList.appendItem(
+		p.createSVGPathSegMovetoAbs(this.downX,this.downY));
 	p.setAttribute("fill","none");
 	baseRadius.path(p);
 	normalColor.path(p);
-	svg.appendChild(p);
+	group.appendChild(p);
 	this.path = p;
 	this.pathMore(); }
 
-var nearPoint = /^ (0,-?[12]|-?[12],0|-?1,-?1)$/
+function nearby(one,two) {
+	var x = one.x - two.x; var y = one.y - two.y;
+	return 9 >= x*x + y*y; }
 
 mouseXY.pathEnd = function() {
 	if (this.path == null) return;
-	var d = this.path.getAttribute("d")
-	var s = d.lastIndexOf(" ")
 	this.path.setAttribute("pointer-events","none");
-	if (d.lastIndexOf(" ",s-1) == 1
-		&& nearPoint.test(d.substr(s))
-		&& this.erase(false))
-		svg.removeChild(this.path);
+	var s = this.path.pathSegList;
+	var n = s.numberOfItems;
+	var click = ( n == 1
+		|| (n == 2 && nearby(s.getItem(1),s.getItem(0))) );
+	if (click && this.erase(false))
+		group.removeChild(this.path);
 	else
 		this.path.removeAttribute("pointer-events");
 	this.path = null; }
 
 mouseXY.hilite = function() {
 	allShapes(pickRadius);
-	for ( var hit = document.elementFromPoint(this.clientX,this.clientY)
-	      ; hit && hit.parentNode == svg
-	      ; hit = document.elementFromPoint(this.clientX,this.clientY) ) {
+	for ( var hit = this.hit()
+	      ; hit && hit.parentNode == group
+	      ; hit = this.hit() ) {
 		hit.setAttribute("pointer-events","none");
 		hit.hit = true; }
-	var found = false; var shape = svg.firstChild.nextSibling;
+	var found = false; var shape = group.firstChild;
 	for ( ; shape ; shape = shape.nextSibling ) {
 		oneShape(shape,baseRadius);
 		if (shape.hit) {
@@ -157,12 +189,12 @@ mouseXY.hilite = function() {
 		oneShape(shape,found ? eraserColor : normalColor); } }
 
 mouseXY.rubber = function() {
-	rubberSet(Math.min(this.downX,this.lastX),
-	          Math.min(this.downY,this.lastY),
-	          Math.abs(this.lastX-this.downX),
-	          Math.abs(this.lastY-this.downY));
+	rubberSet(Math.min(this.downX,this.pageX),
+	          Math.min(this.downY,this.pageY),
+	          Math.abs(this.pageX-this.downX),
+	          Math.abs(this.pageY-this.downY));
 	allShapes(normalColor);
-	var shapes = svg.getEnclosureList(rubberArea,svg);
+	var shapes = svg.getEnclosureList(rubberArea,group);
 	for ( var index = shapes.length - 1 ; index >= 0 ; --index )
 		oneShape(shapes[index],eraserColor); }
 
@@ -185,6 +217,7 @@ var rubberState = new State("rubber",true,true);
 var cancelState = new State("cancel",true,false);
 
 var theState = idleState;
+this.__defineGetter__("state",function(){return theState.name});
 
 State.prototype.go = function() {
 	theState.leave(); this.enter(); theState = this; }
@@ -192,9 +225,8 @@ State.prototype.go = function() {
 mouseXY.move = function(event) {
 	if (event.ctrlKey) { if (!theState.ctrl) theState.ctrldown(); }
 	else /*!event.ctl*/{ if (theState.ctrl) theState.ctrlup(); }
-	if (this.lastX==event.pageX && this.lastY==event.pageY) return;
-	this.prevX = this.lastX; this.lastX = event.pageX;
-	this.prevY = this.lastY; this.lastY = event.pageY;
+	if (this.pageX==event.pageX && this.pageY==event.pageY) return;
+	this.pageX = event.pageX; this.pageY = event.pageY;
 	this.clientX = event.clientX; this.clientY = event.clientY;
 	theState.mousemove(); }
 
@@ -253,10 +285,6 @@ function upMouse(event) {
 	event.preventDefault();
 	theState.mouseup(); }
 
-function focusToMouse(event) {
-	var was = mouseXY.focused;
-	mouseXY.focus(); }
-
 function downKey(event) {
 	if (event.keyCode == 17/*ctrl*/)
 		theState.ctrldown(); }
@@ -264,6 +292,39 @@ function downKey(event) {
 function upKey(event) {
 	if (event.keyCode == 17/*ctrl*/)
 		theState.ctrlup(); }
+
+var listening = false;
+this.__defineGetter__("listening",function(){return listening});
+this.attach = function() { if (!listening) {
+	svg.setAttribute("pointer-events","visiblePainted");
+	svg.addEventListener("mousedown",downMouse);
+	svg.addEventListener("mousemove",moveMouse);
+	svg.addEventListener("mouseup",upMouse);
+	svg.addEventListener("keydown",downKey);
+	svg.addEventListener("keyup",upKey);
+	listening = true; }}
+this.detach = function() { if (listening) {
+	svg.setAttribute("pointer-events","none");
+	svg.removeEventListener("mousedown",downMouse);
+	svg.removeEventListener("mousemove",moveMouse);
+	svg.removeEventListener("mouseup",upMouse);
+	svg.removeEventListener("keydown",downKey);
+	svg.removeEventListener("keyup",upKey);
+	listening = false; }}
+
+}// end Doodle constructor
+
+function Doodledoku()
+{
+
+var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+svg.setAttribute("zoomAndPan","disable");
+svg.style.position = "absolute";
+svg.style.zIndex = 999999999;
+svg.style.top = 0;
+svg.style.left = 0;
+document.body.appendChild(svg);
+this.__defineGetter__("svg",function(){return svg});
 
 function svgResize() {
 	// todo? stretch doodles in clever ways?
@@ -273,53 +334,41 @@ function svgResize() {
 window.addEventListener("resize",svgResize);
 svgResize();
 
+var doodle = new Doodle(svg);
+this.__defineGetter__("doodle",function(){return doodle});
+
 // communication with the extension
 
 var port = chrome.extension.connect();
+this.__defineGetter__("port",function(){return port;});
 
 port.onDisconnect.addListener(function() {
-	detachListeners();
+	doodle.detach();
 	window.removeEventListener("resize",svgResize);
 	document.body.removeChild(svg);
-	svg = undefined; port = undefined; });
+	svg = undefined; doodle = undefined; port = undefined; });
 
-var doodling = false;
-function attachListeners() { if (!doodling) {
-	svg.setAttribute("pointer-events","visiblePainted");
-	svg.addEventListener("mousedown",downMouse);
-	svg.addEventListener("mousemove",moveMouse);
-	svg.addEventListener("mouseup",upMouse);
-	window.addEventListener("keydown",focusToMouse,true);
-	window.addEventListener("keydown",downKey);
-	window.addEventListener("keyup",upKey);
-	doodling = true; }}
-function detachListeners() { if (doodling) {
-	svg.setAttribute("pointer-events","none");
-	svg.removeEventListener("mousedown",downMouse);
-	svg.removeEventListener("mousemove",moveMouse);
-	svg.removeEventListener("mouseup",upMouse);
-	window.removeEventListener("keydown",focusToMouse,true);
-	window.removeEventListener("keydown",downKey);
-	window.removeEventListener("keyup",upKey);
-	doodling = false; }}
+function focusToMouse(event) {
+	var hit = doodle.hit();
+	if (hit) hit.focus(); }
 
 port.onMessage.addListener(function(message) {
 	switch (message) {
-		case "attach": attachListeners(); break;
-		case "detach": detachListeners(); break; } });
+	case "attach":
+		doodle.attach();
+		window.addEventListener("keydown",focusToMouse,true);
+		break;
+	case "detach":
+		doodle.detach();
+		window.removeEventListener("keydown",focusToMouse,true);
+		break; } });
 
-return {
-	get svg() {return svg},
-	get state() {return theState.name},
-	get port() {return port},
-	get doodling() {return doodling},
-	toggle: function() { port.postMessage("toggle"); }
-	};
-}
-if (document.body.nodeName == 'FRAMESET')
-	delete window.doodledoku;
-else
-	window.doodledoku = window.doodledoku();
+this.toggle = function() { port.postMessage("toggle"); }
+
+}// end Doodledoku constructor
+
+if (document.body.nodeName != 'FRAMESET')
+	window.doodledoku = new Doodledoku();
 
 "OK";
 
