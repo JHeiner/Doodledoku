@@ -103,8 +103,7 @@ var initialCode = "\n\
 /*\n\
 if (document.location.hostname == 'www.example.com') {\n\
    // background there is dark, so doodle with white\n\
-   svg.setAttribute('stroke','#fff');\n\
-   svg.setAttribute('fill','#fff');\n\
+   doodledoku.color.normal = '#fff';\n\
   }\n\
 */\n\
 \n\

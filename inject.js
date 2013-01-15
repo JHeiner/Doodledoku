@@ -39,7 +39,7 @@ input.setAttribute("width","100%");
 input.setAttribute("height","100%");
 input.setAttribute("stroke","none");
 input.setAttribute("fill","none");
-input.setAttribute("pointer-events","fill");
+input.setAttribute("pointer-events","none");
 svg.appendChild(input);
 
 var group = svg.ownerDocument.createElementNS(svgNS,"g");
@@ -113,9 +113,13 @@ mouseXY.hit = function() {
 	return svg.ownerDocument.elementFromPoint(this.clientX,this.clientY); }
 
 this.hit = function() {
+	var inputWas = input.getAttribute("pointer-events");
+	input.setAttribute("pointer-events","none");
+	var svgWas = svg.getAttribute("pointer-events");
 	svg.setAttribute("pointer-events","none");
 	var hit = mouseXY.hit();
-	svg.setAttribute("pointer-events","visiblePainted");
+	svg.setAttribute("pointer-events",svgWas);
+	input.setAttribute("pointer-events",inputWas);
 	return hit; }
 
 mouseXY.erase = function(subsequentSiblings) {
@@ -297,6 +301,7 @@ var listening = false;
 this.__defineGetter__("listening",function(){return listening});
 this.attach = function() { if (!listening) {
 	svg.setAttribute("pointer-events","visiblePainted");
+	input.setAttribute("pointer-events","fill");
 	svg.addEventListener("mousedown",downMouse);
 	svg.addEventListener("mousemove",moveMouse);
 	svg.addEventListener("mouseup",upMouse);
@@ -305,6 +310,7 @@ this.attach = function() { if (!listening) {
 	listening = true; }}
 this.detach = function() { if (listening) {
 	svg.setAttribute("pointer-events","none");
+	input.setAttribute("pointer-events","none");
 	svg.removeEventListener("mousedown",downMouse);
 	svg.removeEventListener("mousemove",moveMouse);
 	svg.removeEventListener("mouseup",upMouse);
@@ -314,61 +320,106 @@ this.detach = function() { if (listening) {
 
 }// end Doodle constructor
 
-function Doodledoku()
+function Doodledoku(element,window)
 {
+var doodledoku = this;
+var positioning = null;
+var div = null;
 
-var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+function validateAndSetPositioning() {
+	var style = window.getComputedStyle(element);
+	if ((style.position != 'static' && style.position != 'relative')
+		|| style.top != 'auto' || style.left != 'auto'
+		|| style.right != 'auto' || style.bottom != 'auto' )
+		throw new Error("unexpected positioning on element");
+	positioning = element.style.position;
+	element.style.position = 'relative'; }
+
+var svg = element.ownerDocument.createElementNS(
+	'http://www.w3.org/2000/svg','svg');
 svg.setAttribute("zoomAndPan","disable");
-svg.style.position = "absolute";
-svg.style.zIndex = 999999999;
-svg.style.top = 0;
-svg.style.left = 0;
-document.body.appendChild(svg);
+svg.setAttribute("pointer-events","none");
 this.__defineGetter__("svg",function(){return svg});
 
 function svgResize() {
-	// todo? stretch doodles in clever ways?
+	// only use when element is body
 	svg.style.width = 0; svg.style.height = 0;
-	svg.style.width = document.body.scrollWidth;
-	svg.style.height = document.body.scrollHeight; }
-window.addEventListener("resize",svgResize);
-svgResize();
+	svg.style.width = element.scrollWidth;
+	svg.style.height = element.scrollHeight; }
+
+if (element != element.ownerDocument.body) {
+	validateAndSetPositioning();
+	div = element.ownerDocument.createElement('div');
+	div.style.zIndex = -999999999;
+	div.style.position = "absolute";
+	div.style.top = 0;
+	div.style.left = 0;
+	div.style.bottom = 0;
+	div.style.right = 0;
+	element.appendChild(div);
+	div.appendChild(svg); }
+else /* element is document body */ {
+	svg.style.zIndex = 999999999;
+	svg.style.position = "absolute";
+	svg.style.top = 0;
+	svg.style.left = 0;
+	element.appendChild(svg);
+	window.addEventListener("resize",svgResize);
+	svgResize(); }
 
 var doodle = new Doodle(svg);
 this.__defineGetter__("doodle",function(){return doodle});
+this.__defineGetter__("color",function(){return doodle.color});
+
+function focusToMouse(event) {
+	if (div) div.style.zIndex = -999999999;
+	var hit = doodle.hit();
+	if (div) div.style.zIndex = 999999999;
+	if (hit) hit.focus(); }
+
+function attach() {
+	doodle.attach();
+	if (div) div.style.zIndex = 999999999;
+	window.addEventListener("keydown",focusToMouse,true); }
+
+function detach() {
+	doodle.detach();
+	if (div) div.style.zIndex = -999999999;
+	window.removeEventListener("keydown",focusToMouse,true); }
+
+function destroy() {
+	detach();
+	if (div) {
+		element.removeChild(div);
+		element.style.position = positioning;
+		positioning = null;
+		div = null; }
+	else {
+		window.removeEventListener("resize",svgResize);
+		element.removeChild(svg); }
+	svg = undefined; doodle = undefined; }
 
 // communication with the extension
 
 var port = chrome.extension.connect();
-this.__defineGetter__("port",function(){return port;});
 
-port.onDisconnect.addListener(function() {
-	doodle.detach();
-	window.removeEventListener("resize",svgResize);
-	document.body.removeChild(svg);
-	svg = undefined; doodle = undefined; port = undefined; });
+port.onDisconnect.addListener(destroy);
 
-function focusToMouse(event) {
-	var hit = doodle.hit();
-	if (hit) hit.focus(); }
+this.destroy = function() {
+	port.disconnect(); // surprisingly does not call onDisconnect
+	destroy(); };
 
 port.onMessage.addListener(function(message) {
 	switch (message) {
-	case "attach":
-		doodle.attach();
-		window.addEventListener("keydown",focusToMouse,true);
-		break;
-	case "detach":
-		doodle.detach();
-		window.removeEventListener("keydown",focusToMouse,true);
-		break; } });
+	case "attach": attach(); break;
+	case "detach": detach(); break; } });
 
 this.toggle = function() { port.postMessage("toggle"); }
 
 }// end Doodledoku constructor
 
 if (document.body.nodeName != 'FRAMESET')
-	window.doodledoku = new Doodledoku();
+	window.doodledoku = new Doodledoku(document.body,window);
 
 "OK";
 

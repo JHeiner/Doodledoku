@@ -179,12 +179,19 @@ TabInfo.prototype.injected = function(results) {
 			return; }
 	delete this.toggle;
 	this.toggle();
+	this.readOptions(); }
+
+TabInfo.prototype.readOptions = function() {
 	storage.read(this.sendOptions.bind(this)); }
 
 TabInfo.prototype.sendOptions = function(local,sync) {
 	var options = ("code" in local) ? local.code
 		: ("code" in sync) ? sync.code : null;
 	if (!options) return;
+	if (options.indexOf('"required jQuery";') != -1 && !('jQuery' in this)) {
+		this.jQuery = true;
+		this.executeScript({file:"jquery-1.8.3/jquery.min.js"},"readOptions");
+		return; }
 	options = "if ('doodledoku' in window) {\n"+options+"\n}";
 	this.executeScript({code:options},null); }
 
