@@ -16,8 +16,8 @@ this.viewport = {
 		return this.element.ownerDocument; },
 	createSVG: function(name) {
 		return this.document.createElementNS(svgNS,name); },
-	hit: function(clientX,clientY) {
-		return this.document.elementFromPoint(clientX,clientY); },
+	hit: function(point) {
+		return this.document.elementFromPoint(point.x,point.y); },
 	get inverseCTM() {
 		var m = this.element.getCTM().inverse();
 		for ( var e = this.element ; e ; e = e.offsetParent )
@@ -32,7 +32,7 @@ this.structure = {
 	enclosureList: function(area,parent) {
 		return this.enclosed.getEnclosureList(area,parent); },
 	initialize: function() {
-		this.undoCTM.transform.baseVal.initialize(doodle.viewport.inverseCTM);
+		this.undoCTM.transform.baseVal.appendItem(doodle.viewport.inverseCTM);
 		this.enclosed.setAttribute('width',999999999);
 		this.enclosed.setAttribute('height',999999999);
 		this.enclosed.setAttribute('cursor','crosshair'); } };
@@ -60,78 +60,100 @@ this.input = {
 		this.element.setAttribute('fill','none');
 		this.disable(); } };
 
+var baseWidth = 0; var pickWidth = 0;
+this.width = {
+	get base() {
+		return baseWidth; },
+	set base(x) {
+		baseWidth = x;
+		doodle.doodles.element.setAttribute('stroke-width',x); },
+	get pick() {
+		return pickWidth; },
+	set pick(x) {
+		pickWidth = x; } };
+
+var normalColor = ''; var eraserColor = '';
+this.color = {
+	get normal() {
+		return normalColor; },
+	set normal(x) {
+		normalColor = x;
+		doodle.doodles.element.setAttribute('stroke', x); },
+	get eraser() {
+		return eraserColor; },
+	set eraser(x) {
+		eraserColor = x;
+		doodle.rubber.element.setAttribute('stroke',x); } };
+
 this.doodles = {
 	element: doodle.viewport.createSVG('g'),
 	// keeps the doodles separate from input and rubber rectangle
-	baseRadius: {
-		circle: function(c) {
-			c.setAttribute('r',doodle.radius.base); },
-		path: function(p) {
-			p.setAttribute('stroke-width',2*doodle.radius.base); } },
-	pickRadius: {
-		circle: function(c) {
-			c.hit = false;
-			c.setAttribute('r',doodle.radius.pick); },
-		path: function(p) {
-			p.hit = false;
-			p.setAttribute('stroke-width',2*doodle.radius.pick); } },
-	normalColor: {
-		circle: function(c) {
-			c.setAttribute('fill','inherit');
-			c.removeAttribute('fill'); },
-		path: function(p) {
-			p.setAttribute('stroke','inherit');
-			p.removeAttribute('stroke'); } },
-	eraserColor: {
-		circle: function(c) {
-			c.setAttribute('fill',doodle.color.eraser); },
-		path: function(p) {
-			p.setAttribute('stroke',doodle.color.eraser); } },
-	oneShape: function(shape,actionMap) {
-		actionMap[shape.nodeName](shape); },
-	someShapes: function(shape,actionMap) {
-		for ( ; shape ; shape = shape.nextSibling )
-			this.oneShape(shape,actionMap); },
-	allShapes: function(actionMap) {
-		this.someShapes(this.element.firstChild,actionMap); },
-	get enclosed() {
-		return doodle.structure.enclosed; },
-	hilightArea: function(area) {
-		this.allShapes(this.normalColor);
-		var shapes = doodle.structure.enclosureList(area,this.element);
-		for ( var index = shapes.length - 1 ; index >= 0 ; --index )
-			this.oneShape(shapes.item(index),this.eraserColor); },
-	eraseArea: function(area) {
-		var shapes = doodle.structure.enclosureList(area,this.element);
-		for ( var index = shapes.length - 1 ; index >= 0 ; --index )
-			this.element.removeChild(shapes.item(index));
-		this.allShapes(this.normalColor); },
-	hilightMouseXY: function() {
-		this.allShapes(this.pickRadius);
-		for ( var hit = doodle.mouseXY.hit()
-			  ; hit && hit.parentNode == this.element
-			  ; hit = doodle.mouseXY.hit() ) {
-			hit.setAttribute('pointer-events','none');
-			hit.hit = true; }
-		var found = false; var shape = this.element.firstChild;
-		for ( ; shape ; shape = shape.nextSibling ) {
-			this.oneShape(shape,this.baseRadius);
-			if (shape.hit) {
-				shape.removeAttribute('pointer-events');
-				found = true; }
-			this.oneShape(shape,found?this.eraserColor:this.normalColor); } },
-	eraseMouseXY: function(subsequentSiblings) {
-		var found = false; this.allShapes(this.pickRadius);
-		for ( var hit = doodle.mouseXY.hit()
-			  ; hit && hit.parentNode == this.element
-			  ; hit = doodle.mouseXY.hit() ) {
-			if (subsequentSiblings) while (this.element.lastChild != hit)
-				this.element.removeChild(this.element.lastChild);
-			this.element.removeChild(hit); found = true; }
-		this.allShapes(this.baseRadius); return found; },
 	initialize: function() {
 		this.element.setAttribute('stroke-linejoin','round');
-		this.element.setAttribute('stroke-linecap','round'); } };
+		this.element.setAttribute('stroke-linecap','round');
+		this.element.setAttribute('fill','none'); },
+	dot: function(center) {
+		var d = doodle.viewport.createSVG('polygon');
+		var p = doodle.viewport.element.createSVGPoint();
+		p.x = center.x; p.y = center.y;
+		d.points.appendItem(p);
+		this.element.appendChild(d); },
+	lineMore: function(line,more) {
+		var p = doodle.viewport.element.createSVGPoint();
+		p.x = more.x; p.y = more.y;
+		line.points.appendItem(p); },
+	lineStart: function(start) {
+		var l = doodle.viewport.createSVG('polyline');
+		this.lineMore(l,start);
+		this.element.appendChild(l);
+		return l; },
+	pick: function(point) {
+		var found = [];
+		this.element.setAttribute('stroke-width',doodle.width.pick);
+		for ( var hit = doodle.viewport.hit(point)
+			  ; hit && hit.parentNode == this.element
+			  ; hit = doodle.viewport.hit(point) ) {
+			hit.setAttribute('pointer-events','none');
+			found.push(hit); }
+		this.element.setAttribute('stroke-width',doodle.width.base);
+		found.forEach(function(hit){hit.removeAttribute('pointer-events')});
+		return found.reverse(); },
+	removeShape: function(shape) {
+		this.element.removeChild(shape); },
+	hilightShape: function(shape) {
+		shape.setAttribute('stroke',doodle.color.eraser); },
+	hilightArea: function(area) {
+		this.unhilight();
+		var found = doodle.structure.enclosureList(area,this.element);
+		for ( var i = found.length - 1 ; i >= 0 ; -- i )
+			this.hilightShape(found.item(i)); },
+	eraseArea: function(area) {
+		var found = doodle.structure.enclosureList(area,this.element);
+		for ( var i = found.length - 1 ; i >= 0 ; -- i )
+			this.removeShape(found.item(i));
+		this.unhilight(); },
+	hilightPoint: function(point,subsequentSiblings) {
+		this.unhilight();
+		var found = this.pick(point);
+		if (!subsequentSiblings)
+			found.forEach(this.hilightShape,this);
+		else if (found.length)
+			for ( var s = found[0] ; s ; s = s.nextSibling )
+				this.hilightShape(s); },
+	erasePoint: function(point,subsequentSiblings) {
+		var found = this.pick(point);
+		if (!subsequentSiblings)
+			found.forEach(this.removeShape,this);
+		else if (found.length) {
+			var first = found[0];
+			while ( this.element.lastChild != first )
+				this.removeShape( this.element.lastChild );
+			this.removeShape( first ); }
+		this.unhilight(); return found.length; },
+	unhilight: function() {
+		for ( var e = this.element.firstChild ; e ; e = e.nextSibling )
+			//if (e.hasAttribute('stroke'))
+				e.removeAttribute('stroke'); } };
 
 this.rubber = {
 	element: doodle.viewport.createSVG('rect'),
@@ -166,90 +188,49 @@ this.input.initialize();
 this.doodles.initialize();
 this.rubber.initialize();
 
-var baseRadius = 1.5; var pickRadius = 4.5;
-this.radius = {
-	get base() {
-		return baseRadius; },
-	set base(x) {
-		baseRadius = x;
-		doodle.doodles.allShapes(doodle.doodles.baseRadius); },
-	get pick() {
-		return pickRadius; },
-	set pick(x) {
-		pickRadius = x; } };
-
-this.color = {
-	get normal() {
-		return doodle.doodles.element.getAttribute('stroke'); },
-	set normal(x) {
-		doodle.doodles.element.setAttribute('stroke', x);
-		doodle.doodles.element.setAttribute('fill', x); },
-	get eraser() {
-		return doodle.rubber.element.getAttribute('stroke'); },
-	set eraser(x) {
-		doodle.rubber.element.setAttribute('stroke',x); } };
-
+this.width.base = 3;
+this.width.pick = 6;
 this.color.normal = '#333';
 this.color.eraser = '#E9B';
 
 var mouseXY = {
-	pageX: -1, pageY: -1, clientX: -1, clientY: -1,
-	downX: -1, downY: -1, path: null };
-
-mouseXY.down = function() {
-	this.downX = this.pageX; this.downY = this.pageY; }
-
-mouseXY.hit = function() {
-	return doodle.viewport.hit(this.clientX,this.clientY); }
-
-mouseXY.eraseElseDot = function() {
-	if (doodle.doodles.eraseMouseXY(false)) return;
-	var c = doodle.viewport.createSVG('circle');
-	c.setAttribute('cx',this.pageX);
-	c.setAttribute('cy',this.pageY);
-	c.setAttribute('stroke','none');
-	doodle.doodles.baseRadius.circle(c);
-	doodle.doodles.normalColor.circle(c);
-	doodle.doodles.element.appendChild(c); }
-
-mouseXY.pathMore = function() {
-	var s = this.path.pathSegList;
-	var p = s.getItem(s.numberOfItems-1);
-	if (p.x != this.pageX || p.y != this.pageY)
-		s.appendItem(
-			this.path.createSVGPathSegLinetoAbs(this.pageX,this.pageY)); }
-
-mouseXY.pathStart = function() {
-	var p = doodle.viewport.createSVG('path');
-	p.pathSegList.appendItem(
-		p.createSVGPathSegMovetoAbs(this.downX,this.downY));
-	p.setAttribute('fill','none');
-	doodle.doodles.baseRadius.path(p);
-	doodle.doodles.normalColor.path(p);
-	doodle.doodles.element.appendChild(p);
-	this.path = p;
-	this.pathMore(); }
-
-function nearby(one,two) {
-	var x = one.x - two.x; var y = one.y - two.y;
-	return 10 >= x*x + y*y; }
-
-mouseXY.pathEnd = function() {
-	if (this.path == null) return;
-	this.path.setAttribute('pointer-events','none');
-	var s = this.path.pathSegList;
-	var n = s.numberOfItems;
-	var click = ( n == 1
-		|| (n == 2 && nearby(s.getItem(1),s.getItem(0))) );
-	if (click && doodle.doodles.eraseMouseXY(false))
-		doodles.removeChild(this.path);
-	else
-		this.path.removeAttribute('pointer-events');
-	this.path = null; }
-
-mouseXY.rubber = function() {
-	doodle.rubber.set(this.downX,this.downY,this.pageX,this.pageY);
-	doodle.rubber.hilight(); }
+	page: viewport.createSVGPoint(),
+	down: viewport.createSVGPoint(),
+	client: viewport.createSVGPoint(),
+	polyline: null,
+	remember: function() {
+		this.down.x = this.page.x; this.down.y = this.page.y; },
+	hit: function() {
+		return doodle.viewport.hit(this.client); },
+	hilight: function() {
+		doodle.doodles.hilightPoint(this.client,true); },
+	erase: function(subsequentSiblings) {
+		return doodle.doodles.erasePoint(this.client,subsequentSiblings); },
+	eraseElseDot: function() {
+		if (!this.erase(false))
+			doodle.doodles.dot(this.page); },
+	pathMore: function() {
+		doodle.doodles.lineMore(this.polyline,this.page); },
+	pathStart: function() {
+		this.polyline = doodle.doodles.lineStart(this.down);
+		this.pathMore(); },
+	nearby: function(one,two) {
+		var x = one.x - two.x; var y = one.y - two.y;
+		return 10 >= x*x + y*y; },
+	pathEnd: function() {
+		var ps = this.polyline.points;
+		var n = ps.numberOfItems;
+		var click = ( n == 1
+			|| (n == 2 && this.nearby(ps.getItem(1),ps.getItem(0))) );
+		this.polyline.setAttribute('pointer-events','none');
+		if (click && this.erase(false))
+			this.polyline.remove();
+		else
+			this.polyline.removeAttribute('pointer-events');
+		this.polyline = null; },
+	rubber: function() {
+		doodle.rubber.set(this.down.x,this.down.y,this.page.x,this.page.y);
+		doodle.rubber.hilight(); } };
 
 function State(name,mouse,ctrl) {
 	this.name = name; this.mouse = mouse; this.ctrl = ctrl; }
@@ -274,12 +255,14 @@ var theState = idleState;
 State.prototype.go = function() {
 	theState.leave(); this.enter(); theState = this; }
 
-mouseXY.move = function(event) {
+function controlKey(event) {
 	if (event.ctrlKey) { if (!theState.ctrl) theState.ctrldown(); }
-	else /*!event.ctl*/{ if (theState.ctrl) theState.ctrlup(); }
-	if (this.pageX==event.pageX && this.pageY==event.pageY) return;
-	this.pageX = event.pageX; this.pageY = event.pageY;
-	this.clientX = event.clientX; this.clientY = event.clientY;
+	else /*!event.ctl*/{ if (theState.ctrl) theState.ctrlup(); } }
+mouseXY.move = function(event) {
+	controlKey(event);
+	if (this.page.x==event.pageX && this.page.y==event.pageY) return;
+	this.page.x = event.pageX; this.page.y = event.pageY;
+	this.client.x = event.clientX; this.client.y = event.clientY;
 	theState.mousemove(); }
 
 idleState.mousedown = function() { pressedState.go(); }
@@ -293,34 +276,34 @@ drawingState.enter = function() { mouseXY.pathStart(); }
 drawingState.mousemove = function() { mouseXY.pathMore(); }
 drawingState.leave = function() { mouseXY.pathEnd(); }
 drawingState.mouseup = function() { idleState.go(); }
-drawingState.ctrldown = function() { mouseXY.down(); erasingState.go(); }
+drawingState.ctrldown = function() { mouseXY.remember(); erasingState.go(); }
 
-hilitingState.enter = function() { doodle.doodles.hilightMouseXY(); }
-hilitingState.mousemove = function() { doodle.doodles.hilightMouseXY(); }
-hilitingState.leave = function() { doodle.doodles.allShapes(doodle.doodles.normalColor); }
+hilitingState.enter = function() { mouseXY.hilight(); }
+hilitingState.mousemove = function() { mouseXY.hilight(); }
+hilitingState.leave = function() { doodle.doodles.unhilight(); }
 hilitingState.ctrlup = function() { idleState.go(); }
 hilitingState.mousedown = function() { erasingState.go(); }
 
-erasingState.enter = function() { doodle.doodles.hilightMouseXY(); }
+erasingState.enter = function() { mouseXY.hilight(); }
 erasingState.mousemove = function() { rubberState.go(); }
-erasingState.leave = function() { doodle.doodles.allShapes(doodle.doodles.normalColor); }
-erasingState.mouseup = function() { doodle.doodles.eraseMouseXY(true); hilitingState.go(); }
+erasingState.leave = function() { doodle.doodles.unhilight(); }
+erasingState.mouseup = function() { mouseXY.erase(true); hilitingState.go(); }
 erasingState.ctrlup = function() { pressedState.go(); }
 
 rubberState.enter = function() { mouseXY.rubber(); }
 rubberState.mousemove = function() { mouseXY.rubber(); }
-rubberState.leave = function() { doodle.doodles.allShapes(doodle.doodles.normalColor); doodle.rubber.hide(); }
+rubberState.leave = function() { doodle.doodles.unhilight(); doodle.rubber.hide(); }
 rubberState.mouseup = function() { doodle.rubber.erase(); hilitingState.go(); }
 rubberState.ctrlup = function() { cancelState.go(); }
 
 cancelState.mouseup = function() { idleState.go(); }
-cancelState.ctrldown = function() { mouseXY.down(); erasingState.go(); }
+cancelState.ctrldown = function() { mouseXY.remember(); erasingState.go(); }
 
 function downMouse(event) {
 	mouseXY.move(event);
 	if (0 != event.button) return;
 	event.preventDefault();
-	mouseXY.down();
+	mouseXY.remember();
 	theState.mousedown(); }
 
 function moveMouse(event) {
@@ -337,14 +320,6 @@ function upMouse(event) {
 	event.preventDefault();
 	theState.mouseup(); }
 
-function downKey(event) {
-	if (event.keyCode == 17/*ctrl*/)
-		theState.ctrldown(); }
-
-function upKey(event) {
-	if (event.keyCode == 17/*ctrl*/)
-		theState.ctrlup(); }
-
 this.mouseXY = mouseXY;
 this.hit = function() {
 	var was = doodle.input.disable();
@@ -359,16 +334,16 @@ this.attach = function() { if (!listening) {
 	doodle.structure.enclosed.addEventListener('mousedown',downMouse);
 	doodle.structure.enclosed.addEventListener('mousemove',moveMouse);
 	doodle.structure.enclosed.addEventListener('mouseup',upMouse);
-	doodle.structure.enclosed.addEventListener('keydown',downKey);
-	doodle.structure.enclosed.addEventListener('keyup',upKey);
+	window.addEventListener('keydown',controlKey);
+	window.addEventListener('keyup',controlKey);
 	listening = true; }}
 this.detach = function() { if (listening) {
 	doodle.input.disable();
 	doodle.structure.enclosed.removeEventListener('mousedown',downMouse);
 	doodle.structure.enclosed.removeEventListener('mousemove',moveMouse);
 	doodle.structure.enclosed.removeEventListener('mouseup',upMouse);
-	doodle.structure.enclosed.removeEventListener('keydown',downKey);
-	doodle.structure.enclosed.removeEventListener('keyup',upKey);
+	window.removeEventListener('keydown',controlKey);
+	window.removeEventListener('keyup',controlKey);
 	listening = false; }}
 
 }// end Doodle constructor
@@ -444,13 +419,13 @@ function detach() {
 function destroy() {
 	detach();
 	if (div) {
-		element.removeChild(div);
+		div.remove();
 		element.style.position = positioning;
 		positioning = null;
 		div = null; }
 	else {
 		window.removeEventListener('resize',svgResize);
-		element.removeChild(svg); }
+		svg.remove(); }
 	svg = undefined; doodle = undefined; }
 
 // communication with the extension
