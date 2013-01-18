@@ -3,6 +3,110 @@
 
 "use strict";
 
+function Doodles(element) {
+
+	if (element.nodeName != 'svg'
+		|| element.namespaceURI != this.svgNS
+		|| element.hasChildNodes())
+		throw new Error("the arg must be an empty <svg> element");
+
+	element.setAttribute('stroke-linejoin','round');
+	element.setAttribute('stroke-linecap','round');
+	element.setAttribute('fill','none');
+
+	var drawWidth = 0; var pickWidth = 0;
+	this.width = {
+		get draw() { return drawWidth; },
+		set draw(x) { element.setAttribute('stroke-width',drawWidth = x); },
+		get pick() { return pickWidth; },
+		set pick(x) { pickWidth = x; } };
+
+	var normalColor = ''; var eraserColor = '';
+	this.color = {
+		get normal() { return normalColor; },
+		set normal(x) { element.setAttribute('stroke',normalColor = x); },
+		get eraser() { return eraserColor; },
+		set eraser(x) { eraserColor = x; } };
+
+	this.width.draw = 3;
+	this.width.pick = 8;
+	this.color.normal = '#333';
+	this.color.eraser = '#E9B';
+
+	this.__defineGetter__('element',function(){return element}); }
+
+Doodles.prototype = {
+	svgNS: 'http://www.w3.org/2000/svg',
+	get document() { return this.element.ownerDocument; },
+	createSVG: function(name) {
+		return this.document.createElementNS(this.svgNS,name); },
+	dot: function(center) {
+		var d = this.createSVG('polygon');
+		var p = this.element.createSVGPoint();
+		p.x = center.x; p.y = center.y;
+		d.points.appendItem(p);
+		this.element.appendChild(d); },
+	lineMore: function(line,more) {
+		var p = this.element.createSVGPoint();
+		p.x = more.x; p.y = more.y;
+		line.points.appendItem(p); },
+	lineStart: function(start) {
+		var l = this.createSVG('polyline');
+		this.lineMore(l,start);
+		this.element.appendChild(l);
+		return l; },
+	hit: function(point) {
+		return this.document.elementFromPoint(point.x,point.y); },
+	pick: function(point) {
+		// webkit getIntersectionlist is very buggy (does bbox intersection,
+		// ignores pointer-events), but when fixed it should be used instead
+		var found = [];
+		this.element.setAttribute('stroke-width',this.width.pick);
+		for ( var hit = this.hit(point)
+			  ; hit && hit.parentNode == this.element
+			  ; hit = this.hit(point) ) {
+			hit.setAttribute('pointer-events','none');
+			found.push(hit); }
+		this.element.setAttribute('stroke-width',this.width.draw);
+		found.forEach(function(hit){hit.removeAttribute('pointer-events')});
+		return found.reverse(); },
+	hilightShape: function(shape) {
+		shape.setAttribute('stroke',this.color.eraser); },
+	unhilight: function() {
+		for ( var e = this.element.firstChild ; e ; e = e.nextSibling )
+			//if (e.hasAttribute('stroke'))
+				e.removeAttribute('stroke'); },
+	removeShape: function(shape) {
+		this.element.removeChild(shape); },
+	forSelected: function(action,subsequentSiblings,sorted,list) {
+		if (!subsequentSiblings)
+			for ( var i = list.length - 1 ; i >= 0 ; -- i )
+				action.call(this,list[i]);
+		else if (list.length) {
+			var children = this.element.childNodes;
+			var first = children.length;
+			for ( var i = (sorted ? 0 : list.length - 1) ; i >= 0 ; -- i ) {
+				var at = Array.prototype.indexOf.call(children,list[i]);
+				if (at < 0) throw new Error("non-child:"+list[i]);
+				if (at < first) first = at; }
+			for ( var i = children.length - 1 ; i >= first ; -- i )
+				action.call(this,children[i]); }
+		return list.length; },
+	hilightArea: function(area) {
+		this.unhilight();
+		return this.forSelected(this.hilightShape,false,false,
+			this.element.getEnclosureList(area,this.element) ); },
+	eraseArea: function(area) {
+		return this.forSelected(this.removeShape,false,false,
+			this.element.getEnclosureList(area,this.element) ); },
+	hilightPoint: function(point,subsequentSiblings) {
+		this.unhilight();
+		return this.forSelected(this.hilightShape,subsequentSiblings,true,
+			this.pick(point) ); },
+	erasePoint: function(point,subsequentSiblings) {
+		return this.forSelected(this.removeShape,subsequentSiblings,true,
+			this.pick(point) ); } };
+
 function Doodle(viewport)
 {
 var doodle = this;
@@ -54,105 +158,7 @@ this.structure = {
 		this.input.setAttribute('fill','none');
 		this.disable(); } };
 
-var baseWidth = 0; var pickWidth = 0;
-var normalColor = ''; var eraserColor = '';
-
-this.doodles = {
-	element: doodle.viewport.createSVG('svg'),
-	// keeps the doodles separate from input and rubber rectangle
-	initialize: function() {
-		this.element.setAttribute('stroke-linejoin','round');
-		this.element.setAttribute('stroke-linecap','round');
-		this.element.setAttribute('fill','none'); },
-	createSVG: function(name) {
-		return this.element.ownerDocument.createElementNS(svgNS,name); },
-	dot: function(center) {
-		var d = this.createSVG('polygon');
-		var p = this.element.createSVGPoint();
-		p.x = center.x; p.y = center.y;
-		d.points.appendItem(p);
-		this.element.appendChild(d); },
-	lineMore: function(line,more) {
-		var p = this.element.createSVGPoint();
-		p.x = more.x; p.y = more.y;
-		line.points.appendItem(p); },
-	lineStart: function(start) {
-		var l = this.createSVG('polyline');
-		this.lineMore(l,start);
-		this.element.appendChild(l);
-		return l; },
-	width: {
-		get base() {
-			return baseWidth; },
-		set base(x) {
-			baseWidth = x;
-			doodle.doodles.element.setAttribute('stroke-width',x); },
-		get pick() {
-			return pickWidth; },
-		set pick(x) {
-			pickWidth = x; } },
-	color: {
-		get normal() {
-			return normalColor; },
-		set normal(x) {
-			normalColor = x;
-			doodle.doodles.element.setAttribute('stroke', x); },
-		get eraser() {
-			return eraserColor; },
-		set eraser(x) {
-			eraserColor = x;
-			doodle.rubber.element.setAttribute('stroke',x); } },
-	hit: function(point) {
-		return this.element.ownerDocument.elementFromPoint(point.x,point.y); },
-	pick: function(point) {
-		// webkit getIntersectionlist is very buggy (does bbox intersection,
-		// ignores pointer-events), but when fixed it should be used instead
-		var found = [];
-		this.element.setAttribute('stroke-width',this.width.pick);
-		for ( var hit = this.hit(point)
-			  ; hit && hit.parentNode == this.element
-			  ; hit = this.hit(point) ) {
-			hit.setAttribute('pointer-events','none');
-			found.push(hit); }
-		this.element.setAttribute('stroke-width',this.width.base);
-		found.forEach(function(hit){hit.removeAttribute('pointer-events')});
-		return found.reverse(); },
-	removeShape: function(shape) {
-		this.element.removeChild(shape); },
-	hilightShape: function(shape) {
-		shape.setAttribute('stroke',this.color.eraser); },
-	forSelected: function(action,subsequentSiblings,sorted,list) {
-		if (!subsequentSiblings)
-			for ( var i = list.length - 1 ; i >= 0 ; -- i )
-				action.call(this,list[i]);
-		else if (list.length) {
-			var children = this.element.childNodes;
-			var first = children.length;
-			for ( var i = (sorted ? 0 : list.length - 1) ; i >= 0 ; -- i ) {
-				var at = Array.prototype.indexOf.call(children,list[i]);
-				if (at < 0) throw new Error("non-child:"+list[i]);
-				if (at < first) first = at; }
-			for ( var i = children.length - 1 ; i >= first ; -- i )
-				action.call(this,children[i]); }
-		return list.length; },
-	hilightArea: function(area) {
-		this.unhilight();
-		return this.forSelected(this.hilightShape,false,false,
-			this.element.getEnclosureList(area,this.element) ); },
-	eraseArea: function(area) {
-		return this.forSelected(this.removeShape,false,false,
-			this.element.getEnclosureList(area,this.element) ); },
-	hilightPoint: function(point,subsequentSiblings) {
-		this.unhilight();
-		return this.forSelected(this.hilightShape,subsequentSiblings,true,
-			this.pick(point) ); },
-	erasePoint: function(point,subsequentSiblings) {
-		return this.forSelected(this.removeShape,subsequentSiblings,true,
-			this.pick(point) ); },
-	unhilight: function() {
-		for ( var e = this.element.firstChild ; e ; e = e.nextSibling )
-			//if (e.hasAttribute('stroke'))
-				e.removeAttribute('stroke'); } };
+this.doodles = new Doodles(this.viewport.createSVG('svg'));
 
 this.rubber = {
 	element: doodle.viewport.createSVG('rect'),
@@ -190,13 +196,12 @@ this.structure.undoClip.appendChild(this.doodles.element);
 this.structure.undoClip.appendChild(this.rubber.element);
 
 this.structure.initialize();
-this.doodles.initialize();
 this.rubber.initialize();
 
-this.doodles.width.base = 3;
-this.doodles.width.pick = 8;
-this.doodles.color.normal = '#333';
-this.doodles.color.eraser = '#E9B';
+var eraserColorSetter = this.doodles.color.__lookupSetter__('eraser');
+this.doodles.color.__defineSetter__('eraser',function(x){
+	eraserColorSetter(x); doodle.rubber.element.setAttribute('stroke',x); });
+this.doodles.color.eraser = this.doodles.color.eraser
 
 var mouseXY = {
 	page: viewport.createSVGPoint(),
