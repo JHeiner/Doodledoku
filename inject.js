@@ -27,129 +27,128 @@ this.viewport = {
 this.structure = {
 	undoCTM: doodle.viewport.createSVG('g'),
 	// inside of undoCTM the coordinates match the page coordinates
-	enclosed: doodle.viewport.createSVG('svg'),
-	// enclosed is needed so we can call getEnclosureList...
-	enclosureList: function(area,parent) {
-		return this.enclosed.getEnclosureList(area,parent); },
-	initialize: function() {
-		this.undoCTM.transform.baseVal.appendItem(doodle.viewport.inverseCTM);
-		this.enclosed.setAttribute('width',999999999);
-		this.enclosed.setAttribute('height',999999999);
-		this.enclosed.setAttribute('cursor','crosshair'); } };
-
-this.input = {
-	element: doodle.viewport.createSVG('rect'),
-	// input catches mouse events in the blank (un-doodled) areas
-	get enclosed() {
-		return doodle.structure.enclosed; },
+	undoClip: doodle.viewport.createSVG('svg'),
+	// resets the clipping (from viewport clip in page coords).
+	// we cheat here and set w/h very large, rely on viewport to clip
+	input: doodle.viewport.createSVG('rect'),
+	// catches mouse events in the blank (un-doodled) areas
 	get enabled() {
-		return (this.element.getAttribute('pointer-events') != 'none'
-			|| this.enclosed.getAttribute('pointer-events') != 'none'); },
+		return (this.input.getAttribute('pointer-events') != 'none'
+			|| this.undoClip.getAttribute('pointer-events') != 'none'); },
 	disable: function() {
 		if ( ! this.enabled ) return false; else {
-			this.element.setAttribute('pointer-events','none');
-			this.enclosed.setAttribute('pointer-events','none');
+			this.input.setAttribute('pointer-events','none');
+			this.undoClip.setAttribute('pointer-events','none');
 			return true; } },
 	enable: function() {
-		this.element.setAttribute('pointer-events','fill');
-		this.enclosed.setAttribute('pointer-events','visiblePainted'); },
+		this.input.setAttribute('pointer-events','fill');
+		this.undoClip.setAttribute('pointer-events','visiblePainted'); },
 	initialize: function() {
-		this.element.setAttribute('width','100%');
-		this.element.setAttribute('height','100%');
-		this.element.setAttribute('stroke','none');
-		this.element.setAttribute('fill','none');
+		this.undoCTM.transform.baseVal.appendItem(doodle.viewport.inverseCTM);
+		this.undoClip.setAttribute('width',999999999);
+		this.undoClip.setAttribute('height',999999999);
+		this.undoClip.setAttribute('cursor','crosshair');
+		this.input.setAttribute('width','100%');
+		this.input.setAttribute('height','100%');
+		this.input.setAttribute('stroke','none');
+		this.input.setAttribute('fill','none');
 		this.disable(); } };
 
 var baseWidth = 0; var pickWidth = 0;
-this.width = {
-	get base() {
-		return baseWidth; },
-	set base(x) {
-		baseWidth = x;
-		doodle.doodles.element.setAttribute('stroke-width',x); },
-	get pick() {
-		return pickWidth; },
-	set pick(x) {
-		pickWidth = x; } };
-
 var normalColor = ''; var eraserColor = '';
-this.color = {
-	get normal() {
-		return normalColor; },
-	set normal(x) {
-		normalColor = x;
-		doodle.doodles.element.setAttribute('stroke', x); },
-	get eraser() {
-		return eraserColor; },
-	set eraser(x) {
-		eraserColor = x;
-		doodle.rubber.element.setAttribute('stroke',x); } };
 
 this.doodles = {
-	element: doodle.viewport.createSVG('g'),
+	element: doodle.viewport.createSVG('svg'),
 	// keeps the doodles separate from input and rubber rectangle
 	initialize: function() {
 		this.element.setAttribute('stroke-linejoin','round');
 		this.element.setAttribute('stroke-linecap','round');
 		this.element.setAttribute('fill','none'); },
+	createSVG: function(name) {
+		return this.element.ownerDocument.createElementNS(svgNS,name); },
 	dot: function(center) {
-		var d = doodle.viewport.createSVG('polygon');
-		var p = doodle.viewport.element.createSVGPoint();
+		var d = this.createSVG('polygon');
+		var p = this.element.createSVGPoint();
 		p.x = center.x; p.y = center.y;
 		d.points.appendItem(p);
 		this.element.appendChild(d); },
 	lineMore: function(line,more) {
-		var p = doodle.viewport.element.createSVGPoint();
+		var p = this.element.createSVGPoint();
 		p.x = more.x; p.y = more.y;
 		line.points.appendItem(p); },
 	lineStart: function(start) {
-		var l = doodle.viewport.createSVG('polyline');
+		var l = this.createSVG('polyline');
 		this.lineMore(l,start);
 		this.element.appendChild(l);
 		return l; },
+	width: {
+		get base() {
+			return baseWidth; },
+		set base(x) {
+			baseWidth = x;
+			doodle.doodles.element.setAttribute('stroke-width',x); },
+		get pick() {
+			return pickWidth; },
+		set pick(x) {
+			pickWidth = x; } },
+	color: {
+		get normal() {
+			return normalColor; },
+		set normal(x) {
+			normalColor = x;
+			doodle.doodles.element.setAttribute('stroke', x); },
+		get eraser() {
+			return eraserColor; },
+		set eraser(x) {
+			eraserColor = x;
+			doodle.rubber.element.setAttribute('stroke',x); } },
+	hit: function(point) {
+		return this.element.ownerDocument.elementFromPoint(point.x,point.y); },
 	pick: function(point) {
+		// webkit getIntersectionlist is very buggy (does bbox intersection,
+		// ignores pointer-events), but when fixed it should be used instead
 		var found = [];
-		this.element.setAttribute('stroke-width',doodle.width.pick);
-		for ( var hit = doodle.viewport.hit(point)
+		this.element.setAttribute('stroke-width',this.width.pick);
+		for ( var hit = this.hit(point)
 			  ; hit && hit.parentNode == this.element
-			  ; hit = doodle.viewport.hit(point) ) {
+			  ; hit = this.hit(point) ) {
 			hit.setAttribute('pointer-events','none');
 			found.push(hit); }
-		this.element.setAttribute('stroke-width',doodle.width.base);
+		this.element.setAttribute('stroke-width',this.width.base);
 		found.forEach(function(hit){hit.removeAttribute('pointer-events')});
 		return found.reverse(); },
 	removeShape: function(shape) {
 		this.element.removeChild(shape); },
 	hilightShape: function(shape) {
-		shape.setAttribute('stroke',doodle.color.eraser); },
+		shape.setAttribute('stroke',this.color.eraser); },
+	forSelected: function(action,subsequentSiblings,sorted,list) {
+		if (!subsequentSiblings)
+			for ( var i = list.length - 1 ; i >= 0 ; -- i )
+				action.call(this,list[i]);
+		else if (list.length) {
+			var children = this.element.childNodes;
+			var first = children.length;
+			for ( var i = (sorted ? 0 : list.length - 1) ; i >= 0 ; -- i ) {
+				var at = Array.prototype.indexOf.call(children,list[i]);
+				if (at < 0) throw new Error("non-child:"+list[i]);
+				if (at < first) first = at; }
+			for ( var i = children.length - 1 ; i >= first ; -- i )
+				action.call(this,children[i]); }
+		return list.length; },
 	hilightArea: function(area) {
 		this.unhilight();
-		var found = doodle.structure.enclosureList(area,this.element);
-		for ( var i = found.length - 1 ; i >= 0 ; -- i )
-			this.hilightShape(found.item(i)); },
+		return this.forSelected(this.hilightShape,false,false,
+			this.element.getEnclosureList(area,this.element) ); },
 	eraseArea: function(area) {
-		var found = doodle.structure.enclosureList(area,this.element);
-		for ( var i = found.length - 1 ; i >= 0 ; -- i )
-			this.removeShape(found.item(i));
-		this.unhilight(); },
+		return this.forSelected(this.removeShape,false,false,
+			this.element.getEnclosureList(area,this.element) ); },
 	hilightPoint: function(point,subsequentSiblings) {
 		this.unhilight();
-		var found = this.pick(point);
-		if (!subsequentSiblings)
-			found.forEach(this.hilightShape,this);
-		else if (found.length)
-			for ( var s = found[0] ; s ; s = s.nextSibling )
-				this.hilightShape(s); },
+		return this.forSelected(this.hilightShape,subsequentSiblings,true,
+			this.pick(point) ); },
 	erasePoint: function(point,subsequentSiblings) {
-		var found = this.pick(point);
-		if (!subsequentSiblings)
-			found.forEach(this.removeShape,this);
-		else if (found.length) {
-			var first = found[0];
-			while ( this.element.lastChild != first )
-				this.removeShape( this.element.lastChild );
-			this.removeShape( first ); }
-		this.unhilight(); return found.length; },
+		return this.forSelected(this.removeShape,subsequentSiblings,true,
+			this.pick(point) ); },
 	unhilight: function() {
 		for ( var e = this.element.firstChild ; e ; e = e.nextSibling )
 			//if (e.hasAttribute('stroke'))
@@ -160,13 +159,20 @@ this.rubber = {
 	// visible part of the rubber rectangle
 	area: viewport.createSVGRect(),
 	// just the geometry of the rubber rectangle
-	set: function(x1,y1,x2,y2) {
-		this.element.setAttribute('width', this.area.width = Math.abs(x2-x1));
-		this.element.setAttribute('height', this.area.height = Math.abs(y2-y1));
- 		this.element.setAttribute('x', this.area.x = Math.min(x1,x2));
-		this.element.setAttribute('y', this.area.y = Math.min(y1,y2)); },
+	setXYWH: function(x,y,w,h) {
+ 		this.element.setAttribute('x', this.area.x = x);
+		this.element.setAttribute('y', this.area.y = y);
+		this.element.setAttribute('width', this.area.width = w);
+		this.element.setAttribute('height', this.area.height = h); },
+	set2P: function(p1,p2) {
+		this.setXYWH(Math.min(p1.x,p2.x),Math.min(p1.y,p2.y),
+			Math.abs(p2.x-p1.x),Math.abs(p2.y-p1.y)); },
+	setPick: function(point) {
+		var w = doodle.width.pick; var h = w/2;
+		this.setXYWH(point.x - h, point.y - h, w, w );
+		return this.area; },
 	hide: function() {
-		this.set(-1,-1,-1,-1); },
+		this.setXYWH(-1,-1,0,0); },
 	hilight: function() {
 		doodle.doodles.hilightArea(this.area); },
 	erase: function() {
@@ -178,20 +184,19 @@ this.rubber = {
 		this.hide(); } };
 
 this.viewport.element.appendChild(this.structure.undoCTM);
-this.structure.undoCTM.appendChild(this.structure.enclosed);
-this.structure.enclosed.appendChild(this.input.element);
-this.structure.enclosed.appendChild(this.doodles.element);
-this.structure.enclosed.appendChild(this.rubber.element);
+this.structure.undoCTM.appendChild(this.structure.undoClip);
+this.structure.undoClip.appendChild(this.structure.input);
+this.structure.undoClip.appendChild(this.doodles.element);
+this.structure.undoClip.appendChild(this.rubber.element);
 
 this.structure.initialize();
-this.input.initialize();
 this.doodles.initialize();
 this.rubber.initialize();
 
-this.width.base = 3;
-this.width.pick = 6;
-this.color.normal = '#333';
-this.color.eraser = '#E9B';
+this.doodles.width.base = 3;
+this.doodles.width.pick = 8;
+this.doodles.color.normal = '#333';
+this.doodles.color.eraser = '#E9B';
 
 var mouseXY = {
 	page: viewport.createSVGPoint(),
@@ -229,7 +234,7 @@ var mouseXY = {
 			this.polyline.removeAttribute('pointer-events');
 		this.polyline = null; },
 	rubber: function() {
-		doodle.rubber.set(this.down.x,this.down.y,this.page.x,this.page.y);
+		doodle.rubber.set2P(this.down,this.page);
 		doodle.rubber.hilight(); } };
 
 function State(name,mouse,ctrl) {
@@ -251,6 +256,7 @@ var rubberState = new State('rubber',true,true);
 var cancelState = new State('cancel',true,false);
 
 var theState = idleState;
+this.__defineGetter__('state',function(){return theState});
 
 State.prototype.go = function() {
 	theState.leave(); this.enter(); theState = this; }
@@ -322,26 +328,26 @@ function upMouse(event) {
 
 this.mouseXY = mouseXY;
 this.hit = function() {
-	var was = doodle.input.disable();
+	var was = doodle.structure.disable();
 	var hit = mouseXY.hit();
-	if (was ) doodle.input.enable();
+	if (was) doodle.structure.enable();
 	return hit; }
 
 var listening = false;
 this.__defineGetter__('listening',function(){return listening});
 this.attach = function() { if (!listening) {
-	doodle.input.enable();
-	doodle.structure.enclosed.addEventListener('mousedown',downMouse);
-	doodle.structure.enclosed.addEventListener('mousemove',moveMouse);
-	doodle.structure.enclosed.addEventListener('mouseup',upMouse);
+	doodle.structure.enable();
+	doodle.structure.undoClip.addEventListener('mousedown',downMouse);
+	doodle.structure.undoClip.addEventListener('mousemove',moveMouse);
+	doodle.structure.undoClip.addEventListener('mouseup',upMouse);
 	window.addEventListener('keydown',controlKey);
 	window.addEventListener('keyup',controlKey);
 	listening = true; }}
 this.detach = function() { if (listening) {
-	doodle.input.disable();
-	doodle.structure.enclosed.removeEventListener('mousedown',downMouse);
-	doodle.structure.enclosed.removeEventListener('mousemove',moveMouse);
-	doodle.structure.enclosed.removeEventListener('mouseup',upMouse);
+	doodle.structure.disable();
+	doodle.structure.undoClip.removeEventListener('mousedown',downMouse);
+	doodle.structure.undoClip.removeEventListener('mousemove',moveMouse);
+	doodle.structure.undoClip.removeEventListener('mouseup',upMouse);
 	window.removeEventListener('keydown',controlKey);
 	window.removeEventListener('keyup',controlKey);
 	listening = false; }}
@@ -447,8 +453,15 @@ this.toggle = function() { port.postMessage('toggle'); }
 
 }// end Doodledoku constructor
 
-if ('body' in document) if (document.body)
-if (document.body.nodeName != 'FRAMESET')
+if (!chrome.extension)
+	chrome.extension = {
+		connect:function(){return {
+			postMessage:function(){},
+			disconnect:function(){},
+			onMessage:{addListener:function(){}},
+			onDisconnect:{addListener:function(){}} }} };
+
+if (document.body && document.body.nodeName != 'FRAMESET')
 	window.doodledoku = new Doodledoku(document.body,window);
 
 'OK';
