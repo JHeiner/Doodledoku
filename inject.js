@@ -256,6 +256,8 @@ Doodles.Pointer.prototype =
 		this.dom.polys.hilightPoint(this.client,true); },
 	erase: function(subsequentSiblings) {
 		return this.dom.polys.erasePoint(this.client,subsequentSiblings); },
+	eraseSince: function() {
+		this.erase(true); },
 	eraseElseDot: function() {
 		if (!this.erase(false))
 			this.dom.polys.dot(this.page); },
@@ -308,87 +310,71 @@ Doodles.FSM = function(pointer)
 
 	Doodles.readableProperty(this,'pointer',pointer);
 
-	this.State = function(name,mouse,ctrl) {
-		Doodles.readableProperty(this,'name',name);
-		Doodles.readableProperty(this,'mouse',mouse);
-		Doodles.readableProperty(this,'ctrl',ctrl); };
-
-	function noop() {}
-
-	this.State.prototype = {
-		enter: noop, leave: noop,
-		mousemove: noop, mousedown: noop, mouseup: noop,
-		ctrldown: noop, ctrlup: noop,
-		ctrlKey: function(down) {
-			if (down) { if (!this.ctrl) this.ctrldown(); }
-			else/*up*/ { if (this.ctrl) this.ctrlup(); } },
-		constructor: this.State };
-
-	this.idle = new this.State('idle',false,false);
-	this.pressed = new this.State('pressed',true,false);
-	this.drawing = new this.State('drawing',true,false);
-	this.hiliting = new this.State('hiliting',false,true);
-	this.erasing = new this.State('erasing',true,true);
-	this.rubber = new this.State('rubber',true,true);
-	this.cancel = new this.State('cancel',true,false);
-
-	this.current = this.idle;
-
-	var fsm = this;
-	this.State.prototype.go = function() {
-		fsm.current.leave(); (fsm.current = this).enter(); }
-
-	this.idle.mousedown =function(){ fsm.pressed.go(); }
-	this.idle.ctrldown =function(){ fsm.hiliting.go(); }
-
-	this.pressed.mousemove =function(){ fsm.drawing.go(); }
-	this.pressed.mouseup =function(){ pointer.eraseElseDot(); fsm.idle.go(); }
-	this.pressed.ctrldown =function(){ fsm.erasing.go(); }
-
-	this.drawing.enter =function(){ pointer.pathStart(); }
-	this.drawing.mousemove =function(){ pointer.pathMore(); }
-	this.drawing.leave =function(){ pointer.pathEnd(); }
-	this.drawing.mouseup =function(){ fsm.idle.go(); }
-	this.drawing.ctrldown =function(){ pointer.remember(); fsm.erasing.go(); }
-
-	this.hiliting.enter =function(){ pointer.hilight(); }
-	this.hiliting.mousemove =function(){ pointer.hilight(); }
-	this.hiliting.leave =function(){ pointer.unhilight(); }
-	this.hiliting.ctrlup =function(){ fsm.idle.go(); }
-	this.hiliting.mousedown =function(){ fsm.erasing.go(); }
-
-	this.erasing.enter =function(){ pointer.hilight(); }
-	this.erasing.mousemove =function(){ fsm.rubber.go(); }
-	this.erasing.leave =function(){ pointer.unhilight(); }
-	this.erasing.mouseup =function(){ pointer.erase(true); fsm.hiliting.go(); }
-	this.erasing.ctrlup =function(){ fsm.pressed.go(); }
-
-	this.rubber.enter =function(){ pointer.rubberSet(); }
-	this.rubber.mousemove =function(){ pointer.rubberSet(); }
-	this.rubber.leave =function(){ pointer.unhilight(); }
-	this.rubber.mouseup =function(){ pointer.rubberErase(); fsm.hiliting.go(); }
-	this.rubber.ctrlup =function(){ fsm.cancel.go(); }
-
-	this.cancel.mouseup =function(){ fsm.idle.go(); }
-	this.cancel.ctrldown =function(){ pointer.remember(); fsm.erasing.go(); }
+	this.current = 'idle';
 };
 
 Doodles.FSM.prototype =
 {
+	idle: { mouse:false, ctrl:false,
+		mousedown: ['',            'pressed'],
+		ctrldown:  ['',            'hiliting'] },
+	pressed: { mouse:true, ctrl:false,
+		mousemove: ['',            'drawing' ],
+		mouseup:   ['eraseElseDot','idle'],
+		ctrldown:  ['',            'erasing'] },
+	drawing: { mouse:true, ctrl:false,
+		enter:      'pathStart',
+		mousemove: ['pathMore',    ''],
+		leave:      'pathEnd',
+		mouseup:   ['',            'idle'],
+		ctrldown:  ['remember',    'erasing'] },
+	hiliting: { mouse:false, ctrl:true,
+		enter:      'hilight',
+		mousemove: ['hilight',     ''],
+		leave:      'unhilight',
+		ctrlup:    ['',            'idle'],
+		mousedown: ['',            'erasing'] },
+	erasing: { mouse:true, ctrl:true,
+		enter:      'hilight',
+		mousemove: ['',            'rubber'],
+		leave:      'unhilight',
+		mouseup:   ['eraseSince',  'hiliting'],
+		ctrlup:    ['',            'pressed'] },
+	rubber: { mouse:true, ctrl:true,
+		enter:      'rubberSet',
+		mousemove: ['rubberSet',   ''],
+		leave:      'unhilight',
+		mouseup:   ['rubberErase', 'hiliting'],
+		ctrlup:    ['',            'cancel'] },
+	cancel: { mouse:true, ctrl:false,
+		mouseup:   ['',            'idle'],
+		ctrldown:  ['remember',    'erasing'] },
+
 	ctrlKey: function(event) {
-		this.current.ctrlKey(event.ctrlKey); },
+		var state = this.state;
+		if (event.ctrlKey) {
+			if (!state.ctrl) this.follow(state,state.ctrldown); }
+		else /*!ctrlKey*/ {
+			if (state.ctrl) this.follow(state,state.ctrlup); } },
+	get state() {
+		return this[this.current]; },
+	perform: function(actionName) {
+		if (actionName)
+			this.pointer[actionName](); },
+	transition: function(stateName,leaveAction) {
+		if (stateName) {
+			this.perform(leaveAction);
+			this.perform(this[this.current = stateName].enter); } },
+	follow: function(state,edge) {
+		if (edge) {
+			this.perform(edge[0]);
+			this.transition(edge[1],state.leave); } },
+	edge: function(edgeName) {
+		var state = this.state;
+		this.follow(state,state[edgeName]); },
 	constructor: Doodles.FSM,
 	destroy: function() {
 		this.pointer.destroy();
-		delete this.pointer;
-		delete this.State;
-		delete this.idle;
-		delete this.pressed;
-		delete this.drawing;
-		delete this.hiliting;
-		delete this.erasing;
-		delete this.rubber;
-		delete this.cancel;
 		delete this.current; }
 };
 
@@ -417,27 +403,27 @@ Doodles.Events.prototype =
 	downMouse: function(event) {
 		this.controlKey(event);
 		if (this.pointer.move(event))
-			this.fsm.current.mousemove();
+			this.fsm.edge('mousemove');
 		if (0 != event.button) return;
 		event.preventDefault();
 		this.pointer.remember();
-		this.fsm.current.mousedown(); },
+		this.fsm.edge('mousedown'); },
 	moveMouse: function(event) {
-		if (this.fsm.current.mouse && event.which != 1) {
-			var ctrl = this.fsm.current.ctrl
-			if (ctrl) this.fsm.current.ctrlup();
-			this.fsm.current.mouseup();
-			if (ctrl) this.fsm.current.ctrldown(); }
+		if (this.fsm.state.mouse && event.which != 1) {
+			var ctrl = this.fsm.state.ctrl
+			if (ctrl) this.fsm.edge('ctrlup');
+			this.fsm.edge('mouseup');
+			if (ctrl) this.fsm.edge('ctrldown'); }
 		this.controlKey(event);
 		if (this.pointer.move(event))
-			this.fsm.current.mousemove(); },
+			this.fsm.edge('mousemove'); },
 	upMouse: function(event) {
 		this.controlKey(event);
 		if (this.pointer.move(event))
-			this.fsm.current.mousemove();
+			this.fsm.edge('mousemove');
 		if (0 != event.button) return;
 		event.preventDefault();
-		this.fsm.current.mouseup(); },
+		this.fsm.edge('mouseup'); },
 	attach: function() {
 		this.dom.enable();
 		this.dom.undoClip.addEventListener('mousedown',this.downMouse);
