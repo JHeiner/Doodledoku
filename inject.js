@@ -1,10 +1,18 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
-// All rights reserved. See LICENSE file for info.
+// All rights reserved. See LICENSE file for details.
 
 "use strict";
 
+// everything in this file is defined inside of the Doodles object.
+// this first block contains convenience functions and constants.
+
 var Doodles =
 {
+	domNew: function(name,element) {
+		return element.ownerDocument.createElement(name); },
+	domNewNS: function(name,uri,element) {
+		return element.ownerDocument.createElementNS(uri,name); },
+
 	svgURI: 'http://www.w3.org/2000/svg',
 	svgEq: function(name,element) {
 		return element.nodeName == name
@@ -15,17 +23,20 @@ var Doodles =
 		case 'Rect': return svg.createSVGRect();
 		default: return Doodles.domNewNS(name,Doodles.svgURI,svg); } },
 
-	domNew: function(name,element) {
-		return element.ownerDocument.createElement(name); },
-	domNewNS: function(name,uri,element) {
-		return element.ownerDocument.createElementNS(uri,name); },
-
 	hit: function(point,element) {
 		return element.ownerDocument.elementFromPoint(point.x,point.y); },
 };
 
-Doodles.Polys = function(svg)
+// the rest of this file adds object constructors and prototypes.
+// each object class depends only on those that precede it in this file.
+
+// Shapes objects:
+// - use the <svg> element provided to the constructor to hold the doodles.
+// - provide methods to manipulate the doodles.
+
+Doodles.Shapes = function(svg)
 {
+	var shapes = this;
 	this.args = {svg:svg};
 
 	if (!Doodles.svgEq('svg',svg) || svg.hasChildNodes())
@@ -38,14 +49,14 @@ Doodles.Polys = function(svg)
 	var drawWidth = 0; var pickWidth = 0;
 	this.width = {
 		get draw() { return drawWidth; },
-		set draw(x) { svg.setAttribute('stroke-width',drawWidth = x); },
+		set draw(x) { shapes.svg.setAttribute('stroke-width',drawWidth = x); },
 		get pick() { return pickWidth; },
 		set pick(x) { pickWidth = x; } };
 
 	var normalColor = ''; var eraserColor = '';
 	this.color = {
 		get normal() { return normalColor; },
-		set normal(x) { svg.setAttribute('stroke',normalColor = x); },
+		set normal(x) { shapes.svg.setAttribute('stroke',normalColor = x); },
 		get eraser() { return eraserColor; },
 		set eraser(x) { eraserColor = x; } };
 
@@ -55,7 +66,7 @@ Doodles.Polys = function(svg)
 	this.color.eraser = '#E9B';
 };
 
-Doodles.Polys.prototype =
+Doodles.Shapes.prototype =
 {
 	get svg() { return this.args.svg; },
 	get doodles() { return this.svg.childNodes; },
@@ -123,12 +134,19 @@ Doodles.Polys.prototype =
 	erasePoint: function(point,subsequentSiblings) {
 		return this.forSelected(this.removeShape,subsequentSiblings,true,
 			this.pick(point) ); },
-	constructor: Doodles.Polys,
+	constructor: Doodles.Shapes,
 	destroy: function() {
 		delete this.args;
 		delete this.width;
 		delete this.color; }
 };
+
+// DOM objects:
+// - build and manage the node tree needed for doodling.
+// - create a Shape object for a <svg> element nested within the tree.
+// - use the root <svg> element provided to the constructor to hold the tree.
+// Note that the Shapes <svg> element is different from the root <svg>
+// element, and that the root need not be the outermost <svg> element.
 
 Doodles.DOM = function(root)
 {
@@ -158,8 +176,8 @@ Doodles.DOM = function(root)
 	this.catcher.setAttribute('fill','none');
 	this.undoClip.appendChild(this.catcher);
 
-	this.polys = new Doodles.Polys(Doodles.svgNew('svg',this.root));
-	this.undoClip.appendChild(this.polys.svg);
+	this.shapes = new Doodles.Shapes(Doodles.svgNew('svg',this.root));
+	this.undoClip.appendChild(this.shapes.svg);
 
 	this.rubberArea = Doodles.svgNew('Rect',this.root);
 	// just the geometry of the rubber rectangle
@@ -177,9 +195,9 @@ Doodles.DOM = function(root)
 Doodles.DOM.prototype =
 {
 	get root() { return this.args.root; },
-	get doodles() { return this.polys.doodles; },
-	get width() { return this.polys.width; },
-	get height() { return this.polys.height; },
+	get doodles() { return this.shapes.doodles; },
+	get width() { return this.shapes.width; },
+	get color() { return this.shapes.color; },
 	get inverseCTM() {
 		var m = this.root.getCTM().inverse();
 		for ( var e = this.root ; e ; e = e.offsetParent )
@@ -201,32 +219,38 @@ Doodles.DOM.prototype =
 		this.rubberShow.setAttribute('y', this.rubberArea.y = y);
 		this.rubberShow.setAttribute('width', this.rubberArea.width = w);
 		this.rubberShow.setAttribute('height', this.rubberArea.height = h);
-		this.rubberShow.setAttribute('stroke',this.polys.color.eraser); },
+		this.rubberShow.setAttribute('stroke',this.color.eraser); },
 	rubber2P: function(p1,p2) {
 		this.rubberXYWH(Math.min(p1.x,p2.x),Math.min(p1.y,p2.y),
 			Math.abs(p2.x-p1.x),Math.abs(p2.y-p1.y)); },
 	rubberPick: function(point) {
-		var w = this.polys.width.pick; var h = w/2;
+		var w = this.width.pick; var h = w/2;
 		this.rubberXYWH(point.x - h, point.y - h, w, w );
 		return this.area; },
 	rubberHide: function() {
 		this.rubberXYWH(-1,-1,0,0); },
 	rubberHilight: function() {
-		this.polys.hilightArea(this.rubberArea); },
+		this.shapes.hilightArea(this.rubberArea); },
 	rubberErase: function() {
-		this.polys.eraseArea(this.rubberArea); },
+		this.shapes.eraseArea(this.rubberArea); },
 	constructor: Doodles.DOM,
 	destroy: function() {
 		this.root.removeChild(this.undoCTM);
-		this.polys.destroy();
+		this.shapes.destroy();
 		delete this.args;
 		delete this.undoCTM;
 		delete this.undoClip;
 		delete this.catcher;
-		delete this.polys;
+		delete this.shapes;
 		delete this.rubberArea;
 		delete this.rubberShow; }
 };
+
+// Pointer objects:
+// - store mouse event data
+// - create a DOM object for the root element provided to the constructor.
+// - provide methods which use the mouse data to manipulate the DOM
+//   and its Shapes.
 
 Doodles.Pointer = function(root)
 {
@@ -242,9 +266,10 @@ Doodles.Pointer = function(root)
 
 Doodles.Pointer.prototype =
 {
+	get shapes() { return this.dom.shapes; },
 	get doodles() { return this.dom.doodles; },
 	get width() { return this.dom.width; },
-	get height() { return this.dom.height; },
+	get color() { return this.dom.color; },
 	move: function(event) {
 		if (this.client.x==event.clientX && this.client.y==event.clientY
 			&& this.page.x==event.pageX && this.page.y==event.pageY)
@@ -257,18 +282,18 @@ Doodles.Pointer.prototype =
 	hit: function() {
 		return Doodles.hit(this.client,this.args.root); },
 	hilight: function() {
-		this.dom.polys.hilightPoint(this.client,true); },
+		this.shapes.hilightPoint(this.client,true); },
 	erase: function(subsequentSiblings) {
-		return this.dom.polys.erasePoint(this.client,subsequentSiblings); },
+		return this.shapes.erasePoint(this.client,subsequentSiblings); },
 	eraseSince: function() {
 		this.erase(true); },
 	eraseElseDot: function() {
 		if (!this.erase(false))
-			this.dom.polys.dot(this.page); },
+			this.shapes.dot(this.page); },
 	pathMore: function() {
-		this.dom.polys.lineMore(this.polyline,this.page); },
+		this.shapes.lineMore(this.polyline,this.page); },
 	pathStart: function() {
-		this.polyline = this.dom.polys.lineStart(this.mark);
+		this.polyline = this.shapes.lineStart(this.mark);
 		this.pathMore(); },
 	nearby: function(one,two) {
 		var x = one.x - two.x; var y = one.y - two.y;
@@ -290,7 +315,7 @@ Doodles.Pointer.prototype =
 	rubberErase: function() {
 		this.dom.rubberErase(); },
 	unhilight: function() {
-		this.dom.polys.unhilight();
+		this.shapes.unhilight();
 		this.dom.rubberHide(); },
 	underneath: function() {
 		var was = this.dom.disable();
@@ -308,6 +333,11 @@ Doodles.Pointer.prototype =
 		delete this.polyline; }
 };
 
+// FSM objects:
+// - create a Pointer object for the root element provided to the constructor.
+// - manage a finite state machine that reacts to mouse and key events by
+//   calling methods on the Pointer.
+
 Doodles.FSM = function(root)
 {
 	this.args = {root:root};
@@ -319,10 +349,19 @@ Doodles.FSM = function(root)
 
 Doodles.FSM.prototype =
 {
-	get dom() { return this.pointer.dom; },
-	get doodles() { return this.pointer.doodles; },
-	get width() { return this.pointer.width; },
-	get height() { return this.pointer.height; },
+	// each state has:
+	// - mouse, ctrl: two required booleans which are true if the
+	//   state represents one where that button/key is pressed/down.
+	// - enter, leave: two optional strings which name Pointer methods
+	//   to be called upon entering/leaving the state.
+	// - mousedown, mousemove, mouseup, ctrldown, ctrlup: five optional
+	//   string arrays indicating actions to be performed upon receiving
+	//   the corresponding event:
+	//   - [0] names a Pointer method to call.
+	//   - [1] names a state to transition to.
+	// note that each state will have at most three of the five event
+	// "edges" since two will always be redundant (e.g. mousedown in any
+	// state where the button is already pressed).
 	idle: { mouse:false, ctrl:false,
 		mousedown: ['',            'pressed'],
 		ctrldown:  ['',            'hiliting'] },
@@ -357,14 +396,18 @@ Doodles.FSM.prototype =
 	cancel: { mouse:true, ctrl:false,
 		mouseup:   ['',            'idle'],
 		ctrldown:  ['remember',    'erasing'] },
+	// end state definitions
+	get dom() { return this.pointer.dom; },
+	get doodles() { return this.pointer.doodles; },
+	get width() { return this.pointer.width; },
+	get color() { return this.pointer.color; },
+	get state() { return this[this.current]; },
 	ctrlKey: function(event) {
 		var state = this.state;
 		if (event.ctrlKey) {
 			if (!state.ctrl) this.follow(state,state.ctrldown); }
 		else /*!ctrlKey*/ {
 			if (state.ctrl) this.follow(state,state.ctrlup); } },
-	get state() {
-		return this[this.current]; },
 	perform: function(actionName) {
 		if (actionName)
 			this.pointer[actionName](); },
@@ -387,6 +430,17 @@ Doodles.FSM.prototype =
 		delete this.current; }
 };
 
+// Events objects:
+// - create an FSM object for the root element provided to the constructor.
+// - contain event listener methods which trigger the FSM actions.
+// - provide methods to attach/detach the event listeners:
+//   - mouse events come from a node created within the DOM.
+//   - key events come from the source provided to the constructor.
+// - fill in as best as is possible for missing events (e.g. when mouse is
+//   pressed then moves outside the window and released while outside the
+//   window, that mouseup event is not reported to the window).
+// The keySource is typically the window object.
+
 Doodles.Events = function(root,keySource)
 {
 	this.args = {root:root,keySource:keySource};
@@ -408,7 +462,7 @@ Doodles.Events.prototype =
 	get dom() { return this.fsm.dom; },
 	get doodles() { return this.fsm.doodles; },
 	get width() { return this.fsm.width; },
-	get height() { return this.fsm.height; },
+	get color() { return this.fsm.color; },
 	controlKey: function(event) {
 		this.fsm.ctrlKey(event); },
 	downMouse: function(event) {
@@ -468,6 +522,15 @@ Doodles.Events.prototype =
 		delete this.upMouse; }
 };
 
+// Cover objects:
+// - create an outermost <svg> element as a child of the html element
+//   provided to the constructor.
+// - create an Events object for the outermost <svg> element.
+// - arrange for the outermost <svg> to always cover the parent html element.
+
+// CoverBlock objects use css absolute positioning to cover an html element
+// nested within a document body. It does not work for the document body.
+
 Doodles.CoverBlock = function(block,window)
 {
 	this.args = {block:block,window:window};
@@ -511,7 +574,7 @@ Doodles.CoverBlock.prototype =
 	get dom() { return this.events.dom; },
 	get doodles() { return this.events.doodles; },
 	get width() { return this.events.width; },
-	get height() { return this.events.height; },
+	get color() { return this.events.color; },
 	disable: function() {
 		this.div.style.zIndex = -999999999;
 		return Doodles.DOM.prototype.disable.call(this.dom); },
@@ -529,6 +592,9 @@ Doodles.CoverBlock.prototype =
 		delete this.svg;
 		delete this.events; }
 };
+
+// CoverBody listens for window resize events to maintain coverage over
+// the entire document body.
 
 Doodles.CoverBody = function(body,window)
 {
@@ -560,7 +626,7 @@ Doodles.CoverBody.prototype =
 	get dom() { return this.events.dom; },
 	get doodles() { return this.events.doodles; },
 	get width() { return this.events.width; },
-	get height() { return this.events.height; },
+	get color() { return this.events.color; },
 	resize: function() {
 		this.svg.style.width = 0; this.svg.style.height = 0;
 		this.svg.style.width = this.args.body.scrollWidth;
@@ -575,6 +641,13 @@ Doodles.CoverBody.prototype =
 		delete this.events;
 		delete this.resize; }
 };
+
+// Extension objects:
+// - take ownership of the Cover object provided to the constructor, so
+//   destroying the Extension object also destroys its Cover object.
+// - open a port to the Doodledoku extension.
+// - react to messages received on the port by calling methods on the
+//   Cover object (well, on the Events object owned by the Cover object).
 
 Doodles.Extension = function(cover)
 {
@@ -598,7 +671,7 @@ Doodles.Extension.prototype =
 	get dom() { return this.cover.dom; },
 	get doodles() { return this.cover.doodles; },
 	get width() { return this.cover.width; },
-	get height() { return this.cover.height; },
+	get color() { return this.cover.color; },
 	toggle: function() {
 		this.port.postMessage('toggle'); },
 	receive: function(message) {
