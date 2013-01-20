@@ -5,40 +5,47 @@
 
 var Doodles =
 {
-	svgNS: 'http://www.w3.org/2000/svg',
+	svgURI: 'http://www.w3.org/2000/svg',
+	svgEq: function(name,element) {
+		return element.nodeName == name
+			&& element.namespaceURI == Doodles.svgURI },
+	svgNew: function(name,svg) {
+		switch (name) {
+		case 'Point': return svg.createSVGPoint();
+		case 'Rect': return svg.createSVGRect();
+		default: return Doodles.domNewNS(name,Doodles.svgURI,svg); } },
 
-	readableProperty: function(obj,prop,thing) {
-		Object.defineProperty(obj,prop,{
-			configurable: true, enumerable: true, value: thing }); },
-	getterProperty: function(obj,prop,getter) {
-		Object.defineProperty(obj,prop,{
-			configurable: true, enumerable: true, get: getter }); }
+	domNew: function(name,element) {
+		return element.ownerDocument.createElement(name); },
+	domNewNS: function(name,uri,element) {
+		return element.ownerDocument.createElementNS(uri,name); },
+
+	hit: function(point,element) {
+		return element.ownerDocument.elementFromPoint(point.x,point.y); },
 };
 
-Doodles.Polys = function(element)
+Doodles.Polys = function(svg)
 {
-	if (element.nodeName != 'svg'
-		|| element.namespaceURI != Doodles.svgNS
-		|| element.hasChildNodes())
+	this.args = {svg:svg};
+
+	if (!Doodles.svgEq('svg',svg) || svg.hasChildNodes())
 		throw new Error("the arg must be an empty <svg> element");
 
-	Doodles.readableProperty(this,'element',element);
-
-	element.setAttribute('stroke-linejoin','round');
-	element.setAttribute('stroke-linecap','round');
-	element.setAttribute('fill','none');
+	svg.setAttribute('stroke-linejoin','round');
+	svg.setAttribute('stroke-linecap','round');
+	svg.setAttribute('fill','none');
 
 	var drawWidth = 0; var pickWidth = 0;
 	this.width = {
 		get draw() { return drawWidth; },
-		set draw(x) { element.setAttribute('stroke-width',drawWidth = x); },
+		set draw(x) { svg.setAttribute('stroke-width',drawWidth = x); },
 		get pick() { return pickWidth; },
 		set pick(x) { pickWidth = x; } };
 
 	var normalColor = ''; var eraserColor = '';
 	this.color = {
 		get normal() { return normalColor; },
-		set normal(x) { element.setAttribute('stroke',normalColor = x); },
+		set normal(x) { svg.setAttribute('stroke',normalColor = x); },
 		get eraser() { return eraserColor; },
 		set eraser(x) { eraserColor = x; } };
 
@@ -50,53 +57,50 @@ Doodles.Polys = function(element)
 
 Doodles.Polys.prototype =
 {
-	get document() { return this.element.ownerDocument; },
-	createSVG: function(name) {
-		return this.document.createElementNS(Doodles.svgNS,name); },
+	get svg() { return this.args.svg; },
+	get doodles() { return this.svg.childNodes; },
 	dot: function(center) {
-		var d = this.createSVG('polygon');
-		var p = this.element.createSVGPoint();
+		var d = Doodles.svgNew('polygon',this.svg);
+		var p = Doodles.svgNew('Point',this.svg);
 		p.x = center.x; p.y = center.y;
 		d.points.appendItem(p);
-		this.element.appendChild(d); },
+		this.svg.appendChild(d); },
 	lineMore: function(line,more) {
-		var p = this.element.createSVGPoint();
+		var p = Doodles.svgNew('Point',this.svg);
 		p.x = more.x; p.y = more.y;
 		line.points.appendItem(p); },
 	lineStart: function(start) {
-		var l = this.createSVG('polyline');
+		var l = Doodles.svgNew('polyline',this.svg);
 		this.lineMore(l,start);
-		this.element.appendChild(l);
+		this.svg.appendChild(l);
 		return l; },
-	hit: function(point) {
-		return this.document.elementFromPoint(point.x,point.y); },
 	pick: function(point) {
 		// webkit getIntersectionList is very buggy (does bbox, completely
 		// ignoring pointer-events), but when fixed it should be used instead
 		var found = [];
-		this.element.setAttribute('stroke-width',this.width.pick);
-		for ( var hit = this.hit(point)
-			  ; hit && hit.parentNode == this.element
-			  ; hit = this.hit(point) ) {
+		this.svg.setAttribute('stroke-width',this.width.pick);
+		for ( var hit = Doodles.hit(point,this.svg)
+			  ; hit && hit.parentNode == this.svg
+			  ; hit = Doodles.hit(point,this.svg) ) {
 			hit.setAttribute('pointer-events','none');
 			found.push(hit); }
-		this.element.setAttribute('stroke-width',this.width.draw);
+		this.svg.setAttribute('stroke-width',this.width.draw);
 		found.forEach(function(hit){hit.removeAttribute('pointer-events')});
 		return found.reverse(); },
 	hilightShape: function(shape) {
 		shape.setAttribute('stroke',this.color.eraser); },
 	unhilight: function() {
-		for ( var e = this.element.firstChild ; e ; e = e.nextSibling )
+		for ( var e = this.svg.firstChild ; e ; e = e.nextSibling )
 			//if (e.hasAttribute('stroke'))
 				e.removeAttribute('stroke'); },
 	removeShape: function(shape) {
-		this.element.removeChild(shape); },
+		this.svg.removeChild(shape); },
 	forSelected: function(action,subsequentSiblings,sorted,list) {
 		if (!subsequentSiblings)
 			for ( var i = list.length - 1 ; i >= 0 ; -- i )
 				action.call(this,list[i]);
 		else if (list.length) {
-			var children = this.element.childNodes;
+			var children = this.doodles;
 			var first = children.length;
 			for ( var i = (sorted ? 0 : list.length - 1) ; i >= 0 ; -- i ) {
 				var at = Array.prototype.indexOf.call(children,list[i]);
@@ -108,10 +112,10 @@ Doodles.Polys.prototype =
 	hilightArea: function(area) {
 		this.unhilight();
 		return this.forSelected(this.hilightShape,false,false,
-			this.element.getEnclosureList(area,this.element) ); },
+			this.svg.getEnclosureList(area,this.svg) ); },
 	eraseArea: function(area) {
 		return this.forSelected(this.removeShape,false,false,
-			this.element.getEnclosureList(area,this.element) ); },
+			this.svg.getEnclosureList(area,this.svg) ); },
 	hilightPoint: function(point,subsequentSiblings) {
 		this.unhilight();
 		return this.forSelected(this.hilightShape,subsequentSiblings,true,
@@ -121,25 +125,24 @@ Doodles.Polys.prototype =
 			this.pick(point) ); },
 	constructor: Doodles.Polys,
 	destroy: function() {
-		delete this.element;
+		delete this.args;
 		delete this.width;
 		delete this.color; }
 };
 
-Doodles.DOM = function(element)
+Doodles.DOM = function(root)
 {
-	if (element.nodeName != 'svg'
-		|| element.namespaceURI != Doodles.svgNS)
+	this.args = {root:root};
+
+	if (!Doodles.svgEq('svg',root))
 		throw new Error("the arg must be a <svg> element");
 
-	Doodles.readableProperty(this,'element',element);
-
-	this.undoCTM = this.createSVG('g'),
+	this.undoCTM = Doodles.svgNew('g',this.root),
 	// inside of undoCTM the coordinates match the page coordinates
 	this.undoCTM.transform.baseVal.appendItem(this.inverseCTM);
-	element.appendChild(this.undoCTM);
+	root.appendChild(this.undoCTM);
 
-	this.undoClip = this.createSVG('svg'),
+	this.undoClip = Doodles.svgNew('svg',this.root),
 	// resets the clipping (from viewport clip in page coords).
 	// we cheat here and set w/h very large, rely on viewport to clip
 	this.undoClip.setAttribute('width',999999999);
@@ -147,7 +150,7 @@ Doodles.DOM = function(element)
 	this.undoClip.setAttribute('cursor','crosshair');
 	this.undoCTM.appendChild(this.undoClip);
 
-	this.catcher = this.createSVG('rect'),
+	this.catcher = Doodles.svgNew('rect',this.root),
 	// catches mouse events in the blank (un-doodled) areas
 	this.catcher.setAttribute('width','100%');
 	this.catcher.setAttribute('height','100%');
@@ -155,12 +158,12 @@ Doodles.DOM = function(element)
 	this.catcher.setAttribute('fill','none');
 	this.undoClip.appendChild(this.catcher);
 
-	this.polys = new Doodles.Polys(this.createSVG('svg'));
-	this.undoClip.appendChild(this.polys.element);
+	this.polys = new Doodles.Polys(Doodles.svgNew('svg',this.root));
+	this.undoClip.appendChild(this.polys.svg);
 
-	this.rubberArea = element.createSVGRect();
+	this.rubberArea = Doodles.svgNew('Rect',this.root);
 	// just the geometry of the rubber rectangle
-	this.rubberShow = this.createSVG('rect');
+	this.rubberShow = Doodles.svgNew('rect',this.root);
 	// visible part of the rubber rectangle
 	this.rubberShow.setAttribute('fill','none');
 	this.rubberShow.setAttribute('stroke-dasharray','5');
@@ -173,16 +176,15 @@ Doodles.DOM = function(element)
 
 Doodles.DOM.prototype =
 {
-	get document() { return this.element.ownerDocument; },
-	createSVG: function(name) {
-		return this.document.createElementNS(Doodles.svgNS,name); },
-	hit: function(point) {
-		return this.document.elementFromPoint(point.x,point.y); },
+	get root() { return this.args.root; },
+	get doodles() { return this.polys.doodles; },
+	get width() { return this.polys.width; },
+	get height() { return this.polys.height; },
 	get inverseCTM() {
-		var m = this.element.getCTM().inverse();
-		for ( var e = this.element ; e ; e = e.offsetParent )
+		var m = this.root.getCTM().inverse();
+		for ( var e = this.root ; e ; e = e.offsetParent )
 			m = m.translate(-e.offsetLeft,-e.offsetTop);
-		return this.element.createSVGTransformFromMatrix(m); },
+		return this.root.createSVGTransformFromMatrix(m); },
 	get enabled() {
 		return (this.catcher.getAttribute('pointer-events') != 'none'
 			|| this.undoClip.getAttribute('pointer-events') != 'none'); },
@@ -215,9 +217,9 @@ Doodles.DOM.prototype =
 		this.polys.eraseArea(this.rubberArea); },
 	constructor: Doodles.DOM,
 	destroy: function() {
-		this.element.removeChild(this.undoCTM);
+		this.root.removeChild(this.undoCTM);
 		this.polys.destroy();
-		delete this.element;
+		delete this.args;
 		delete this.undoCTM;
 		delete this.undoClip;
 		delete this.catcher;
@@ -226,21 +228,23 @@ Doodles.DOM.prototype =
 		delete this.rubberShow; }
 };
 
-Doodles.Pointer = function(dom)
+Doodles.Pointer = function(root)
 {
-	if (!(dom instanceof Doodles.DOM))
-		throw new Error("the arg must be a Doodles.DOM");
+	this.args = {root:root};
 
-	Doodles.readableProperty(this,'dom',dom);
+	this.dom = new Doodles.DOM(root);
 
-	this.client = dom.element.createSVGPoint();
-	this.page = dom.element.createSVGPoint();
-	this.mark = dom.element.createSVGPoint();
+	this.client = Doodles.svgNew('Point',root);
+	this.page = Doodles.svgNew('Point',root);
+	this.mark = Doodles.svgNew('Point',root);
 	this.polyline = null;
 };
 
 Doodles.Pointer.prototype =
 {
+	get doodles() { return this.dom.doodles; },
+	get width() { return this.dom.width; },
+	get height() { return this.dom.height; },
 	move: function(event) {
 		if (this.client.x==event.clientX && this.client.y==event.clientY
 			&& this.page.x==event.pageX && this.page.y==event.pageY)
@@ -251,7 +255,7 @@ Doodles.Pointer.prototype =
 	remember: function() {
 		this.mark.x = this.page.x; this.mark.y = this.page.y; },
 	hit: function() {
-		return this.dom.hit(this.client); },
+		return Doodles.hit(this.client,this.args.root); },
 	hilight: function() {
 		this.dom.polys.hilightPoint(this.client,true); },
 	erase: function(subsequentSiblings) {
@@ -296,6 +300,7 @@ Doodles.Pointer.prototype =
 	constructor: Doodles.Pointer,
 	destroy: function() {
 		this.dom.destroy();
+		delete this.args;
 		delete this.dom;
 		delete this.client;
 		delete this.page;
@@ -303,18 +308,21 @@ Doodles.Pointer.prototype =
 		delete this.polyline; }
 };
 
-Doodles.FSM = function(pointer)
+Doodles.FSM = function(root)
 {
-	if (!(pointer instanceof Doodles.Pointer))
-		throw new Error("the arg must be a Doodles.Pointer");
+	this.args = {root:root};
 
-	Doodles.readableProperty(this,'pointer',pointer);
+	this.pointer = new Doodles.Pointer(root);
 
 	this.current = 'idle';
 };
 
 Doodles.FSM.prototype =
 {
+	get dom() { return this.pointer.dom; },
+	get doodles() { return this.pointer.doodles; },
+	get width() { return this.pointer.width; },
+	get height() { return this.pointer.height; },
 	idle: { mouse:false, ctrl:false,
 		mousedown: ['',            'pressed'],
 		ctrldown:  ['',            'hiliting'] },
@@ -349,7 +357,6 @@ Doodles.FSM.prototype =
 	cancel: { mouse:true, ctrl:false,
 		mouseup:   ['',            'idle'],
 		ctrldown:  ['remember',    'erasing'] },
-
 	ctrlKey: function(event) {
 		var state = this.state;
 		if (event.ctrlKey) {
@@ -375,20 +382,19 @@ Doodles.FSM.prototype =
 	constructor: Doodles.FSM,
 	destroy: function() {
 		this.pointer.destroy();
+		delete this.args;
+		delete this.pointer;
 		delete this.current; }
 };
 
-Doodles.Events = function(element,keyEventSource)
+Doodles.Events = function(root,keySource)
 {
-	Doodles.readableProperty(this,'keyEventSource',keyEventSource);
+	this.args = {root:root,keySource:keySource};
 
-	Doodles.readableProperty(this,'fsm',
-		new Doodles.FSM(new Doodles.Pointer(new Doodles.DOM(element))) );
+	if (!keySource)
+		throw new Error("the 2nd arg should be the window");
 
-	Doodles.readableProperty(this,'pointer',this.fsm.pointer);
-	Doodles.readableProperty(this,'dom',this.fsm.pointer.dom);
-	Doodles.getterProperty(this,'polys',function(){
-		return this.fsm.pointer.dom.polys; });
+	this.fsm = new Doodles.FSM(root);
 
 	this.controlKey = Doodles.Events.prototype.controlKey.bind(this);
 	this.downMouse = Doodles.Events.prototype.downMouse.bind(this);
@@ -398,16 +404,22 @@ Doodles.Events = function(element,keyEventSource)
 
 Doodles.Events.prototype =
 {
+	get pointer() { return this.fsm.pointer; },
+	get dom() { return this.fsm.dom; },
+	get doodles() { return this.fsm.doodles; },
+	get width() { return this.fsm.width; },
+	get height() { return this.fsm.height; },
 	controlKey: function(event) {
 		this.fsm.ctrlKey(event); },
 	downMouse: function(event) {
 		this.controlKey(event);
 		if (this.pointer.move(event))
 			this.fsm.edge('mousemove');
-		if (0 != event.button) return;
-		event.preventDefault();
-		this.pointer.remember();
-		this.fsm.edge('mousedown'); },
+		if (0 == event.button) {
+			event.preventDefault();
+			this.pointer.remember();
+			this.fsm.edge('mousedown'); }
+		this.focusMouse(); },
 	moveMouse: function(event) {
 		if (this.fsm.state.mouse && event.which != 1) {
 			var ctrl = this.fsm.state.ctrl
@@ -416,37 +428,40 @@ Doodles.Events.prototype =
 			if (ctrl) this.fsm.edge('ctrldown'); }
 		this.controlKey(event);
 		if (this.pointer.move(event))
-			this.fsm.edge('mousemove'); },
+			this.fsm.edge('mousemove');
+		this.focusMouse(); },
 	upMouse: function(event) {
 		this.controlKey(event);
 		if (this.pointer.move(event))
 			this.fsm.edge('mousemove');
-		if (0 != event.button) return;
-		event.preventDefault();
-		this.fsm.edge('mouseup'); },
+		if (0 == event.button) {
+			event.preventDefault();
+			this.fsm.edge('mouseup'); }
+		this.focusMouse(); },
+	focusMouse: function() {
+		var under = this.pointer.underneath();
+		if (under && 'function' == typeof under.focus)
+			under.focus(); },
 	attach: function() {
 		this.dom.enable();
 		this.dom.undoClip.addEventListener('mousedown',this.downMouse);
 		this.dom.undoClip.addEventListener('mousemove',this.moveMouse);
 		this.dom.undoClip.addEventListener('mouseup',this.upMouse);
-		this.keyEventSource.addEventListener('keydown',this.controlKey);
-		this.keyEventSource.addEventListener('keyup',this.controlKey); },
+		this.args.keySource.addEventListener('keydown',this.controlKey);
+		this.args.keySource.addEventListener('keyup',this.controlKey); },
 	detach: function() {
 		this.dom.disable();
 		this.dom.undoClip.removeEventListener('mousedown',this.downMouse);
 		this.dom.undoClip.removeEventListener('mousemove',this.moveMouse);
 		this.dom.undoClip.removeEventListener('mouseup',this.upMouse);
-		this.keyEventSource.removeEventListener('keydown',this.controlKey);
-		this.keyEventSource.removeEventListener('keyup',this.controlKey); },
+		this.args.keySource.removeEventListener('keydown',this.controlKey);
+		this.args.keySource.removeEventListener('keyup',this.controlKey); },
 	constructor: Doodles.Events,
 	destroy: function() {
 		this.detach();
 		this.fsm.destroy();
-		delete this.keyEventSource;
+		delete this.args;
 		delete this.fsm;
-		delete this.pointer;
-		delete this.dom;
-		delete this.polys;
 		delete this.controlKey;
 		delete this.downMouse;
 		delete this.moveMouse;
@@ -455,119 +470,115 @@ Doodles.Events.prototype =
 
 Doodles.CoverBlock = function(block,window)
 {
+	this.args = {block:block,window:window};
+
 	var computed = window.getComputedStyle(block);
-	if (body.nodeName == 'BODY'
+	if (block.ownerDocument.body == block
 		|| (computed.position != 'static' && computed.position != 'relative')
 		|| computed.top != 'auto' || computed.left != 'auto'
 		|| computed.right != 'auto' || computed.bottom != 'auto' )
-		throw new Error("the arg can not be the <body> element,"
+		throw new Error("the 1st arg can not be the <body> element,"
 		                +" and must be static or relative positioned");
-console.log("block.display=",computed.display);
 	computed = undefined;
-	this.positioning = block.style.position;
+
+	this.originalBlockPositioning = block.style.position;
 	block.style.position = 'relative';
 
-	Doodles.readableProperty(this,'block',element);
-	Doodles.readableProperty(this,'window',window);
+	this.div = Doodles.domNew('div',block);
+	this.div.style.position = 'absolute';
+	this.div.style.zIndex = -999999999;
+	this.div.style.top = 0;
+	this.div.style.left = 0;
+	this.div.style.bottom = 0;
+	this.div.style.right = 0;
+	block.appendChild(this.div);
 
-	var div = block.ownerDocument.createElement('div');
-	div.style.zIndex = -999999999;
-	div.style.position = 'absolute';
-	div.style.top = 0;
-	div.style.left = 0;
-	div.style.bottom = 0;
-	div.style.right = 0;
-	block.appendChild(div);
+	this.svg = Doodles.svgNew('svg',block);
+	this.svg.setAttribute('zoomAndPan','disable');
+	this.svg.setAttribute('pointer-events','none');
+	this.div.appendChild(this.svg);
 
-	// div necessary to get the cover correct, but it obscures
-	// underneath (which always returns div). can play with zIndex
-	// to get around this, but focus to pointer in a block???
+	this.events = new Doodles.Events(this.svg,window);
 
-	var svg = body.ownerDocument.createElementNS(Doodles.svgNS,'svg');
-	svg.setAttribute('zoomAndPan','disable');
-	svg.setAttribute('pointer-events','none');
-	div.appendChild(svg);
-
-	Doodles.readableProperty(this,'div',div);
-	Doodles.readableProperty(this,'svg',svg);
-
-	Doodles.Events.call(this,svg,window);
+	this.dom.enable = Doodles.CoverBlock.prototype.enable.bind(this);
+	this.dom.disable = Doodles.CoverBlock.prototype.disable.bind(this);
 };
 
 Doodles.CoverBlock.prototype =
 {
-	__proto__: Doodles.Events.prototype,
-	attach: function() {
-		Doodles.Events.prototype.attach.call(this);
-		this.div.style.zIndex = 999999999; },
-	detach: function() {
-		Doodles.Events.prototype.detach.call(this);
-		this.div.style.zIndex = -999999999; },
+	get fsm() { return this.events.fsm; },
+	get pointer() { return this.events.pointer; },
+	get dom() { return this.events.dom; },
+	get doodles() { return this.events.doodles; },
+	get width() { return this.events.width; },
+	get height() { return this.events.height; },
+	disable: function() {
+		this.div.style.zIndex = -999999999;
+		return Doodles.DOM.prototype.disable.call(this.dom); },
+	enable: function() {
+		this.div.style.zIndex = 999999999;
+		Doodles.DOM.prototype.enable.call(this.dom); },
 	constructor: Doodles.CoverBlock,
 	destroy: function() {
-		Doodles.Events.prototype.destroy.call(this);
-		this.block.removeChild(this.div);
-		this.block.style.position = this.positioning;
-		delete this.positioning;
-		delete this.block;
-		delete this.window;
+		this.events.destroy();
+		this.args.block.removeChild(this.div);
+		this.args.block.style.position = this.originalBlockPositioning;
+		delete this.args;
+		delete this.originalBlockPositioning;
 		delete this.div;
-		delete this.svg; }
+		delete this.svg;
+		delete this.events; }
 };
 
 Doodles.CoverBody = function(body,window)
 {
-	if (body.nodeName != 'BODY')
-		throw new Error("the arg must be the <body> element");
+	this.args = {body:body,window:window};
 
-	Doodles.readableProperty(this,'body',body);
-	Doodles.readableProperty(this,'window',window);
+	if (body.ownerDocument.body != body)
+		throw new Error("the 1st arg must be the <body> element");
 
-	var svg = body.ownerDocument.createElementNS(Doodles.svgNS,'svg');
-	svg.setAttribute('zoomAndPan','disable');
-	svg.setAttribute('pointer-events','none');
-	svg.style.zIndex = 999999999;
-	svg.style.position = 'absolute';
-	svg.style.top = 0;
-	svg.style.left = 0;
-	body.appendChild(svg);
+	this.svg = Doodles.svgNew('svg',body);
+	this.svg.setAttribute('zoomAndPan','disable');
+	this.svg.setAttribute('pointer-events','none');
+	this.svg.style.zIndex = 999999999;
+	this.svg.style.position = 'absolute';
+	this.svg.style.top = 0;
+	this.svg.style.left = 0;
+	body.appendChild(this.svg);
 
-	Doodles.readableProperty(this,'svg',svg);
-	this.svgResize = Doodles.CoverBody.prototype.svgResize.bind(this);
-	window.addEventListener('resize',this.svgResize);
-	this.svgResize();
+	this.events = new Doodles.Events(this.svg,window);
 
-	Doodles.Events.call(this,svg,window);
-
-	// hack to get focus to pointer...
-	this.controlKey = Doodles.CoverBody.prototype.controlKey.bind(this);
+	this.resize = Doodles.CoverBody.prototype.resize.bind(this);
+	window.addEventListener('resize',this.resize);
+	this.resize();
 };
 
 Doodles.CoverBody.prototype =
 {
-	__proto__: Doodles.Events.prototype,
-	controlKey: function(event) {
-		Doodles.Events.prototype.controlKey.call(this,event);
-		if (this.dom.enabled)
-			this.pointer.underneath().focus(); },
-	svgResize: function() {
+	get fsm() { return this.events.fsm; },
+	get pointer() { return this.events.pointer; },
+	get dom() { return this.events.dom; },
+	get doodles() { return this.events.doodles; },
+	get width() { return this.events.width; },
+	get height() { return this.events.height; },
+	resize: function() {
 		this.svg.style.width = 0; this.svg.style.height = 0;
-		this.svg.style.width = this.body.scrollWidth;
-		this.svg.style.height = this.body.scrollHeight; },
+		this.svg.style.width = this.args.body.scrollWidth;
+		this.svg.style.height = this.args.body.scrollHeight; },
 	constructor: Doodles.CoverBody,
 	destroy: function() {
-		Doodles.Events.prototype.destroy.call(this);
-		this.window.removeEventListener('resize',this.svgResize);
-		this.body.removeChild(this.svg);
-		delete this.body;
-		delete this.window;
+		this.args.window.removeEventListener('resize',this.resize);
+		this.events.destroy();
+		this.args.body.removeChild(this.svg);
+		delete this.args;
 		delete this.svg;
-		delete this.svgResize; }
+		delete this.events;
+		delete this.resize; }
 };
 
-Doodles.Extension = function(body,window)
+Doodles.Extension = function(cover)
 {
-	Doodles.CoverBody.call(this,body,window);
+	this.args = {cover:cover};
 
 	this.port = chrome.extension.connect();
 
@@ -580,24 +591,33 @@ Doodles.Extension = function(body,window)
 
 Doodles.Extension.prototype =
 {
-	__proto__: Doodles.CoverBody.prototype,
+	get cover() { return this.args.cover; },
+	get events() { return this.cover.events; },
+	get fsm() { return this.cover.fsm; },
+	get pointer() { return this.cover.pointer; },
+	get dom() { return this.cover.dom; },
+	get doodles() { return this.cover.doodles; },
+	get width() { return this.cover.width; },
+	get height() { return this.cover.height; },
 	toggle: function() {
 		this.port.postMessage('toggle'); },
 	receive: function(message) {
 		switch (message) {
-		case 'attach': this.attach(); break;
-		case 'detach': this.detach(); break; } },
+		case 'attach': this.events.attach(); break;
+		case 'detach': this.events.detach(); break; } },
 	constructor: Doodles.Extension,
 	destroy: function() {
 		this.port.disconnect(); // surprisingly does not call onDisconnect
-		Doodles.CoverBody.prototype.destroy.call(this);
+		this.cover.destroy();
+		delete this.args;
 		delete this.port;
 		delete this.destroy;
 		delete this.receive; }
 };
 
 if (document.body && document.body.nodeName != 'FRAMESET')
-	window.doodledoku = new Doodles.Extension(document.body,window);
+	window.doodledoku =
+		new Doodles.Extension(new Doodles.CoverBody(document.body,window));
 
 'OK';
 
