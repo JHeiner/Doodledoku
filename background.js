@@ -178,7 +178,6 @@ TabInfo.prototype.injected = function(results) {
 			console.error("weird results:",results);
 			return; }
 	delete this.toggle;
-	this.toggle();
 	this.readOptions(); }
 
 TabInfo.prototype.readOptions = function() {
@@ -186,14 +185,15 @@ TabInfo.prototype.readOptions = function() {
 
 TabInfo.prototype.sendOptions = function(local,sync) {
 	var options = ("code" in local) ? local.code
-		: ("code" in sync) ? sync.code : null;
-	if (!options) return;
+		: ("code" in sync) ? sync.code : "";
 	if (options.indexOf('"required jQuery";') != -1 && !('jQuery' in this)) {
 		this.jQuery = true;
 		this.executeScript({file:"jquery-1.8.3/jquery.min.js"},"readOptions");
 		return; }
-	options = "if ('doodledoku' in window) {\n"+options+"\n}";
-	this.executeScript({code:options},null); }
+	this.executeScript({code:
+		"if (document.body.nodeName != 'FRAMESET') {\n window.doodles ="
+		+" new Doodles.Extension(new Doodles.CoverBody(document.body,window));"
+		+"\n window.doodles.toggle(); \n"+ options + "\n }" },null); }
 
 chrome.extension.onConnect.addListener(function(port) {
 	var tab = port.sender.tab;

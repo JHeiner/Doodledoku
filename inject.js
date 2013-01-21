@@ -688,9 +688,5 @@ Doodles.Extension.prototype =
 		delete this.receive; }
 };
 
-if (document.body && document.body.nodeName != 'FRAMESET')
-	window.doodledoku =
-		new Doodles.Extension(new Doodles.CoverBody(document.body,window));
-
 'OK';
 
