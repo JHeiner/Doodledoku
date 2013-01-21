@@ -18,6 +18,7 @@ All rights reserved. See LICENSE file for info. -->
 	.CodeMirror { height:auto; }
 	.CodeMirror-scroll { overflow-y:hidden; overflow-x:auto; }
 </style>
+<script src="doodles.js"></script>
 <script src="options.js"></script>
 </head>
 <body style="background:#eee;padding:10px;min-width:715px;">
@@ -123,9 +124,9 @@ which pages have been injected, so when you click on the button it knows whether
 to tell the page to toggle or to inject the doodling code into the page.</p>
 <p>Why does this matter? Well, at the moment the only way to set any options is
 to add your own javascript code to the injected code. What you enter on the
-<b>Options</b> tab is appended to the contents of the
-<a href="hack.html">inject.js</a> file, and the result is what gets
-injected. Yes, it is a stretch to call this "setting options", but that's how it
+<b>Options</b> tab is injected after the contents of the
+<a href="hack.html">doodles.js</a> file. Yes, it is a stretch to call this
+"setting options", but that's how it
 works for now. You'll need to understand what is being injected and exactly when
 that code gets injected in order to do anything useful with the <b>Options</b>
 tab.</p>
@@ -169,6 +170,12 @@ href="https://chrome.google.com/webstore/detail/doodledoku/adcigljcdlemflbekljdf
 
 <div id=diffs>
 <p>In version:</p>
+<div class=diff>10 <small><i>(2013-01-21)</i></small><ul>
+    <li>Rewrote the injected code to be a proper library &amp; renamed it
+	<a href="hack.html">doodles.js</a>.
+    <li>The focus-follows-pointer behavior is continuous now (not just on
+	key presses).
+</div>
 <div class=diff>9 <small><i>(2013-01-07)</i></small><ul>
     <li>Added "use strict"; to all my code.
     <li>Fixed a rarely occurring bug in the badge status.

@@ -167,7 +167,7 @@ TabInfo.prototype.bodyNodeName = function(results) {
 	else if ('BODY' != results[0]) {
 		console.error("weird results:",results);
 		return; }
-	this.executeScript({file:"inject.js"},"injected"); }
+	this.executeScript({file:"doodles.js"},"injected"); }
 
 TabInfo.prototype.injected = function(results) {
 	if ( !Array.isArray(results) || results.length <= 0 ) {

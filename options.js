@@ -102,14 +102,14 @@ var initialCode = "\n\
 \n\
 /*\n\
 if (document.location.hostname == 'www.example.com') {\n\
-   // background there is dark, so doodle with white\n\
-   doodledoku.color.normal = '#fff';\n\
+   // background is too dark to see the doodles...\n\
+   doodles.color.normal = 'cyan';\n\
   }\n\
 */\n\
 \n\
 // unfortunately you'll need to read and understand\n\
 // the doodle source code, and there are no guarantees\n\
-// that updates to doodle won't break your code. sorry.\n";
+// that updates to doodledoku won't break your code.\n";
 
 $(function () {
 
@@ -118,10 +118,6 @@ $(function () {
 			if (ui.newPanel[0].id != "tweak") return;
 			var mirror = editor.mirror;
 			if (mirror) mirror.refresh(); } });
-
-	var inject = document.createElement("script");
-	inject.setAttribute("src","inject.js");
-	document.head.appendChild(inject);
 
 	$("#expandAll").on("click",function() {
 		$('details').each(function() {
@@ -147,5 +143,7 @@ $(function () {
 		if (("code" in local) || ("code" in sync))
 			$tabs.tabs('option','active',-1); });
 
+	window.doodles =
+		new Doodles.Extension(new Doodles.CoverBody(document.body,window));
 });
 
