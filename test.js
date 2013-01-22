@@ -56,15 +56,25 @@ function ndom(node) {
 	var result = {};
 	result[node.nodeName] = nseq(node.childNodes,nmap(node.attributes));
 	return result; }
+var expectedDSL = {
+	line: function() {
+		return {polyline:{points:Array.prototype.join.call(arguments,' ')}}; },
+	dot: function(x,y) {
+		return {polygon:{points:(x+' '+y)}}; } };
 function drawn(expected) {
-	var evaluated = eval('['+expected+']');
-	if (!expected) expected = "should be zero shapes";
-	else expected = "shapes should be: ["+expected+"]";
+	var evaluated = [];
+	if (!expected)
+		expected = "should be zero shapes";
+	else {
+		evaluated = expected.split(',').map(function(x){
+			var oparen = x.indexOf('(');
+			if (x.charAt(x.length-1) != ')')
+				throw new Error("last char of call not close paren ("+x+")");
+			var name = x.substring(0,oparen);
+			var args = x.substring(oparen+1,x.length-1).split(' ');
+			return expectedDSL[name].apply(null,args); });
+		expected = "shapes should be: ["+expected+"]"; }
 	deepEqual(nseq(cover.doodles),evaluated,expected); }
-function dot(x,y) {
-	return {polygon:{points:(x+' '+y)}}; }
-function line() {
-	return {polyline:{points:Array.prototype.join.call(arguments,' ')}}; }
 function clear() {
 	// cover.dom.shapes.svg.innerHTML = ''; // doesn't work for svg !
 	for ( var i = cover.doodles.length - 1 ; i >= 0 ; -- i )
@@ -107,15 +117,15 @@ test("CoverBlock",3,function(){
 
 module("basic doodling",lifecycle);
 test("dot",1,function(){
-	move(10,20);click(); drawn('dot(10,20)'); });
+	move(10,20);click(); drawn('dot(10 20)'); });
 test("line",1,function(){
-	move(20,10);drag(40,40,50,20); drawn('line(20,10,40,40,50,20)'); });
+	move(20,10);drag(40,40,50,20); drawn('line(20 10 40 40 50 20)'); });
 test("both (dot,line)",1,function(){
 	move(10,20);click(); move(20,10);drag(40,40);
-	drawn('dot(10,20),line(20,10,40,40)'); });
+	drawn('dot(10 20),line(20 10 40 40)'); });
 test("both (line,dot)",1,function(){
 	move(20,10);drag(40,40); move(10,20);click();
-	drawn('line(20,10,40,40),dot(10,20)'); });
+	drawn('line(20 10 40 40),dot(10 20)'); });
 
 module("basic erasing",lifecycle);
 test("right over dot",1,function(){
@@ -149,40 +159,40 @@ test("within area",5,function(){
 	move(15,15);click();
 	move(10,10);click(); move(10,20);click();
 	move(20,10);click(); move(20,20);click();
-	erase(8,22,22,8); drawn('dot(10,10),dot(10,20),dot(20,10),dot(20,20)');
+	erase(8,22,22,8); drawn('dot(10 10),dot(10 20),dot(20 10),dot(20 20)');
 	move(15,15);click();
 	cover.width.pick = 1;
-	erase(9,9,21,11); drawn('dot(10,20),dot(20,20),dot(15,15)');
+	erase(9,9,21,11); drawn('dot(10 20),dot(20 20),dot(15 15)');
 	move(10,10);click(); move(20,10);click();
-	erase(21,11,9,21); drawn('dot(10,10),dot(20,10)'); });
+	erase(21,11,9,21); drawn('dot(10 10),dot(20 10)'); });
 
 module("not quite erasing",lifecycle);
 test("far from dot",1,function(){
 	// at default pick width (8) this is just past the edge...
 	move(20,20);click(); move(20,24);click();
-	drawn('dot(20,20),dot(20,24)'); });
+	drawn('dot(20 20),dot(20 24)'); });
 test("3pt smudge",1,function(){
 	move(20,20);click(); move(21,19);drag(19,21,20,20);
-	drawn('dot(20,20),line(21,19,19,21,20,20)'); });
+	drawn('dot(20 20),line(21 19 19 21 20 20)'); });
 
 module("pick width",lifecycle);
 test("around edge 9",12,function(){
 	cover.width.pick = 9; // continuing from "far from dot"
-	move(20,20);click(); move(20,25);click(); drawn('dot(20,20),dot(20,25)');
+	move(20,20);click(); move(20,25);click(); drawn('dot(20 20),dot(20 25)');
 	clear(); move(20,20);click(); move(20,24);click(); drawn('');
-	move(20,20);click(); move(25,20);click(); drawn('dot(20,20),dot(25,20)');
+	move(20,20);click(); move(25,20);click(); drawn('dot(20 20),dot(25 20)');
 	clear(); move(20,20);click(); move(24,20);click(); drawn('');
-	move(20,20);click(); move(20,15);click(); drawn('dot(20,20),dot(20,15)');
+	move(20,20);click(); move(20,15);click(); drawn('dot(20 20),dot(20 15)');
 	clear(); move(20,20);click(); move(20,16);click(); drawn('');
-	move(20,20);click(); move(15,20);click(); drawn('dot(20,20),dot(15,20)');
+	move(20,20);click(); move(15,20);click(); drawn('dot(20 20),dot(15 20)');
 	clear(); move(20,20);click(); move(16,20);click(); drawn(''); });
 test("around edge 21",12,function(){
 	cover.width.pick = 21;
-	move(20,20);click(); move(20,31);click(); drawn('dot(20,20),dot(20,31)');
+	move(20,20);click(); move(20,31);click(); drawn('dot(20 20),dot(20 31)');
 	clear(); move(20,20);click(); move(20,30);click(); drawn('');
-	move(20,20);click(); move(31,20);click(); drawn('dot(20,20),dot(31,20)');
+	move(20,20);click(); move(31,20);click(); drawn('dot(20 20),dot(31 20)');
 	clear(); move(20,20);click(); move(30,20);click(); drawn('');
-	move(20,20);click(); move(20, 9);click(); drawn('dot(20,20),dot(20, 9)');
+	move(20,20);click(); move(20, 9);click(); drawn('dot(20 20),dot(20 9)');
 	clear(); move(20,20);click(); move(20,10);click(); drawn('');
-	move(20,20);click(); move( 9,20);click(); drawn('dot(20,20),dot( 9,20)');
+	move(20,20);click(); move( 9,20);click(); drawn('dot(20 20),dot(9 20)');
 	clear(); move(20,20);click(); move(10,20);click(); drawn(''); });
