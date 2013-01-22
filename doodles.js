@@ -235,10 +235,10 @@ Doodles.DOM.prototype =
 	rubber2P: function(p1,p2) {
 		this.rubberXYWH(Math.min(p1.x,p2.x),Math.min(p1.y,p2.y),
 			Math.abs(p2.x-p1.x),Math.abs(p2.y-p1.y)); },
-	rubberPick: function(point) {
+	/*rubberPick: function(point) {
 		var w = this.width.pick; var h = w/2;
 		this.rubberXYWH(point.x - h, point.y - h, w, w );
-		return this.area; },
+		return this.area; },*/
 	rubberHide: function() {
 		this.rubberXYWH(-1,-1,0,0); },
 	rubberHilight: function() {

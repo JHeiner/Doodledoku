@@ -12,6 +12,22 @@ Doodles.off = function(element,event,action) {
 			listeners.splice(i,1); i = -1; } }
 	originalOff(element,event,action); }
 
+var called = {};
+['Shapes','DOM','Pointer','FSM','Events','CoverBlock','CoverBody']
+.forEach(function(typeName){
+	var typeProto = Doodles[typeName].prototype;
+	Object.getOwnPropertyNames(typeProto)
+	.forEach(function(propName){
+		var desc = Object.getOwnPropertyDescriptor(typeProto,propName);
+		var func = desc.value;
+		if ('function' != typeof func) return;
+		if ('constructor' == propName) return;
+		var name = typeName+'.'+propName;
+		called[name] = 0;
+		typeProto[propName] = function() {
+			++called[name]; return func.apply(this,arguments); }
+	}); });
+
 var cover = null;
 var event = {
 	clientX:0,clientY:0,pageX:0,pageY:0,which:0,button:0,ctrlKey:false };
@@ -28,7 +44,7 @@ function move(x,y,hold) {
 		cover.events.moveMouse(event); }
 function drag() {
 	mouse(1);
-	for (i = 0 ; i < arguments.length ; i += 2)
+	for (var i = 0 ; i < arguments.length ; i += 2)
 		move(arguments[i],arguments[i+1]);
 	mouse(0); }
 function ctrl(down,hold) {
@@ -60,7 +76,15 @@ var expectedDSL = {
 	line: function() {
 		return {polyline:{points:Array.prototype.join.call(arguments,' ')}}; },
 	dot: function(x,y) {
-		return {polygon:{points:(x+' '+y)}}; } };
+		return {polygon:{points:(x+' '+y)}}; },
+	DOT: function(x,y) {
+		var dot = expectedDSL.dot(x,y);
+		dot.polygon.stroke = cover.color.eraser;
+		return dot; },
+	LINE: function(x,y) {
+		var line = expectedDSL.line.apply(null,arguments);
+		line.polyline.stroke = cover.color.eraser;
+		return line; } };
 function drawn(expected) {
 	var evaluated = [];
 	if (!expected)
@@ -196,3 +220,34 @@ test("around edge 21",12,function(){
 	clear(); move(20,20);click(); move(20,10);click(); drawn('');
 	move(20,20);click(); move( 9,20);click(); drawn('dot(20 20),dot(9 20)');
 	clear(); move(20,20);click(); move(10,20);click(); drawn(''); });
+
+module("subsequentSiblings stuff",lifecycle);
+test("non-overlapping dots",4,function(){
+	move(10,10);click(); move(20,20);click(); move(30,30);click();
+	ctrl(1); drawn('dot(10 10),dot(20 20),DOT(30 30)');
+	move(20,20); drawn('dot(10 10),DOT(20 20),DOT(30 30)');
+	move(10,10); drawn('DOT(10 10),DOT(20 20),DOT(30 30)');
+	click(); drawn(''); });
+test("overlapping shapes",4,function(){
+	move(20,20);click();
+	move(10,10);drag(30,30); move(10,30);drag(30,10);
+	move(20,10);drag(20,30); move(10,20);drag(30,20);
+	ctrl(1);
+	drawn('dot(20 20),line(10 10 30 30),line(10 30 30 10),'
+	      +'line(20 10 20 30),LINE(10 20 30 20)');
+	move(20,10);
+	drawn('dot(20 20),line(10 10 30 30),line(10 30 30 10),'
+	      +'LINE(20 10 20 30),LINE(10 20 30 20)');
+	move(20,20);
+	drawn('DOT(20 20),LINE(10 10 30 30),LINE(10 30 30 10),'
+	      +'LINE(20 10 20 30),LINE(10 20 30 20)');
+	click(); drawn(''); });
+
+module("finished");
+setTimeout(function() {
+	test("coverage",1,function(){
+		var uncalled = [];
+		for (var name in called) if (!called[name]) uncalled.push(name);
+		deepEqual(uncalled,[],"should be zero uncalled methods") });
+	},100);
+
