@@ -25,6 +25,13 @@ var Doodles =
 
 	hit: function(point,element) {
 		return element.ownerDocument.elementFromPoint(point.x,point.y); },
+
+	on: function(element,event,action) {
+		if (!event) element.addListener(action);
+		else element.addEventListener(event,action); },
+	off: function(element,event,action) {
+		if (!event) element.removeListener(action);
+		else element.removeEventListener(event,action); }
 };
 
 // the rest of this file adds object constructors and prototypes.
@@ -120,13 +127,18 @@ Doodles.Shapes.prototype =
 			for ( var i = children.length - 1 ; i >= first ; -- i )
 				action.call(this,children[i]); }
 		return list.length; },
+	enclosed: function(area) {
+		this.svg.setAttribute('stroke-width',this.width.pick);
+		var list = this.svg.getEnclosureList(area,this.svg);
+		this.svg.setAttribute('stroke-width',this.width.draw);
+		return list; },
 	hilightArea: function(area) {
 		this.unhilight();
 		return this.forSelected(this.hilightShape,false,false,
-			this.svg.getEnclosureList(area,this.svg) ); },
+			this.enclosed(area) ); },
 	eraseArea: function(area) {
 		return this.forSelected(this.removeShape,false,false,
-			this.svg.getEnclosureList(area,this.svg) ); },
+			this.enclosed(area) ); },
 	hilightPoint: function(point,subsequentSiblings) {
 		this.unhilight();
 		return this.forSelected(this.hilightShape,subsequentSiblings,true,
@@ -270,12 +282,12 @@ Doodles.Pointer.prototype =
 	get doodles() { return this.dom.doodles; },
 	get width() { return this.dom.width; },
 	get color() { return this.dom.color; },
-	move: function(event) {
-		if (this.client.x==event.clientX && this.client.y==event.clientY
-			&& this.page.x==event.pageX && this.page.y==event.pageY)
+	move: function(clientX,clientY,pageX,pageY) {
+		if (this.client.x == clientX && this.client.y == clientY
+			&& this.page.x == pageX && this.page.y == pageY)
 			return false;
-		this.client.x = event.clientX; this.client.y = event.clientY;
-		this.page.x = event.pageX; this.page.y = event.pageY;
+		this.client.x = clientX; this.client.y = clientY;
+		this.page.x = pageX; this.page.y = pageY;
 		return true; },
 	remember: function() {
 		this.mark.x = this.page.x; this.mark.y = this.page.y; },
@@ -402,12 +414,10 @@ Doodles.FSM.prototype =
 	get width() { return this.pointer.width; },
 	get color() { return this.pointer.color; },
 	get state() { return this[this.current]; },
-	ctrlKey: function(event) {
+	controlKey: function(down) {
 		var state = this.state;
-		if (event.ctrlKey) {
-			if (!state.ctrl) this.follow(state,state.ctrldown); }
-		else /*!ctrlKey*/ {
-			if (state.ctrl) this.follow(state,state.ctrlup); } },
+		if (down) { if (!state.ctrl) this.follow(state,state.ctrldown); }
+		else/*up*/{ if (state.ctrl) this.follow(state,state.ctrlup); } },
 	perform: function(actionName) {
 		if (actionName)
 			this.pointer[actionName](); },
@@ -450,7 +460,7 @@ Doodles.Events = function(root,keySource)
 
 	this.fsm = new Doodles.FSM(root);
 
-	this.controlKey = Doodles.Events.prototype.controlKey.bind(this);
+	this.ctrlKey = Doodles.Events.prototype.ctrlKey.bind(this);
 	this.downMouse = Doodles.Events.prototype.downMouse.bind(this);
 	this.moveMouse = Doodles.Events.prototype.moveMouse.bind(this);
 	this.upMouse = Doodles.Events.prototype.upMouse.bind(this);
@@ -463,14 +473,16 @@ Doodles.Events.prototype =
 	get doodles() { return this.fsm.doodles; },
 	get width() { return this.fsm.width; },
 	get color() { return this.fsm.color; },
-	controlKey: function(event) {
-		this.fsm.ctrlKey(event); },
+	ctrlKey: function(event) {
+		this.fsm.controlKey(event.ctrlKey); },
+	pointerMove: function(event) {
+		return this.pointer.move(
+			event.clientX,event.clientY,event.pageX,event.pageY ); },
 	downMouse: function(event) {
-		this.controlKey(event);
-		if (this.pointer.move(event))
+		this.ctrlKey(event);
+		if (this.pointerMove(event))
 			this.fsm.edge('mousemove');
 		if (0 == event.button) {
-			event.preventDefault();
 			this.pointer.remember();
 			this.fsm.edge('mousedown'); }
 		this.focusMouse(); },
@@ -480,16 +492,15 @@ Doodles.Events.prototype =
 			if (ctrl) this.fsm.edge('ctrlup');
 			this.fsm.edge('mouseup');
 			if (ctrl) this.fsm.edge('ctrldown'); }
-		this.controlKey(event);
-		if (this.pointer.move(event))
+		this.ctrlKey(event);
+		if (this.pointerMove(event))
 			this.fsm.edge('mousemove');
 		this.focusMouse(); },
 	upMouse: function(event) {
-		this.controlKey(event);
-		if (this.pointer.move(event))
+		this.ctrlKey(event);
+		if (this.pointerMove(event))
 			this.fsm.edge('mousemove');
 		if (0 == event.button) {
-			event.preventDefault();
 			this.fsm.edge('mouseup'); }
 		this.focusMouse(); },
 	focusMouse: function() {
@@ -498,25 +509,25 @@ Doodles.Events.prototype =
 			under.focus(); },
 	attach: function() {
 		this.dom.enable();
-		this.dom.undoClip.addEventListener('mousedown',this.downMouse);
-		this.dom.undoClip.addEventListener('mousemove',this.moveMouse);
-		this.dom.undoClip.addEventListener('mouseup',this.upMouse);
-		this.args.keySource.addEventListener('keydown',this.controlKey);
-		this.args.keySource.addEventListener('keyup',this.controlKey); },
+		Doodles.on(this.dom.undoClip,'mousedown',this.downMouse);
+		Doodles.on(this.dom.undoClip,'mousemove',this.moveMouse);
+		Doodles.on(this.dom.undoClip,'mouseup',this.upMouse);
+		Doodles.on(this.args.keySource,'keydown',this.ctrlKey);
+		Doodles.on(this.args.keySource,'keyup',this.ctrlKey); },
 	detach: function() {
 		this.dom.disable();
-		this.dom.undoClip.removeEventListener('mousedown',this.downMouse);
-		this.dom.undoClip.removeEventListener('mousemove',this.moveMouse);
-		this.dom.undoClip.removeEventListener('mouseup',this.upMouse);
-		this.args.keySource.removeEventListener('keydown',this.controlKey);
-		this.args.keySource.removeEventListener('keyup',this.controlKey); },
+		Doodles.off(this.dom.undoClip,'mousedown',this.downMouse);
+		Doodles.off(this.dom.undoClip,'mousemove',this.moveMouse);
+		Doodles.off(this.dom.undoClip,'mouseup',this.upMouse);
+		Doodles.off(this.args.keySource,'keydown',this.ctrlKey);
+		Doodles.off(this.args.keySource,'keyup',this.ctrlKey); },
 	constructor: Doodles.Events,
 	destroy: function() {
 		this.detach();
 		this.fsm.destroy();
 		delete this.args;
 		delete this.fsm;
-		delete this.controlKey;
+		delete this.ctrlKey;
 		delete this.downMouse;
 		delete this.moveMouse;
 		delete this.upMouse; }
@@ -545,6 +556,7 @@ Doodles.CoverBlock = function(block,window)
 	computed = undefined;
 
 	this.originalBlockPositioning = block.style.position;
+	this.originalBlockHasStyle = block.hasAttribute('style');
 	block.style.position = 'relative';
 
 	this.div = Doodles.domNew('div',block);
@@ -586,8 +598,12 @@ Doodles.CoverBlock.prototype =
 		this.events.destroy();
 		this.args.block.removeChild(this.div);
 		this.args.block.style.position = this.originalBlockPositioning;
+		if (!this.args.block.getAttribute('style')
+			&& !this.originalBlockHasStyle)
+			this.args.block.removeAttribute('style');
 		delete this.args;
 		delete this.originalBlockPositioning;
+		delete this.originalBlockHasStyle;
 		delete this.div;
 		delete this.svg;
 		delete this.events; }
@@ -615,7 +631,7 @@ Doodles.CoverBody = function(body,window)
 	this.events = new Doodles.Events(this.svg,window);
 
 	this.resize = Doodles.CoverBody.prototype.resize.bind(this);
-	window.addEventListener('resize',this.resize);
+	Doodles.on(window,'resize',this.resize);
 	this.resize();
 };
 
@@ -633,7 +649,7 @@ Doodles.CoverBody.prototype =
 		this.svg.style.height = this.args.body.scrollHeight; },
 	constructor: Doodles.CoverBody,
 	destroy: function() {
-		this.args.window.removeEventListener('resize',this.resize);
+		Doodles.off(this.args.window,'resize',this.resize);
 		this.events.destroy();
 		this.args.body.removeChild(this.svg);
 		delete this.args;
@@ -656,10 +672,10 @@ Doodles.Extension = function(cover)
 	this.port = chrome.extension.connect();
 
 	this.destroy = Doodles.Extension.prototype.destroy.bind(this);
-	this.port.onDisconnect.addListener(this.destroy);
+	Doodles.on(this.port.onDisconnect,'',this.destroy);
 
 	this.receive = Doodles.Extension.prototype.receive.bind(this);
-	this.port.onMessage.addListener(this.receive);
+	Doodles.on(this.port.onMessage,'',this.receive);
 };
 
 Doodles.Extension.prototype =
@@ -680,6 +696,8 @@ Doodles.Extension.prototype =
 		case 'detach': this.events.detach(); break; } },
 	constructor: Doodles.Extension,
 	destroy: function() {
+		Doodles.off(this.port.onMessage,'',this.receive);
+		Doodles.off(this.port.onDisconnect,'',this.destroy);
 		this.port.disconnect(); // surprisingly does not call onDisconnect
 		this.cover.destroy();
 		delete this.args;
