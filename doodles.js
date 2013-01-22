@@ -128,10 +128,7 @@ Doodles.Shapes.prototype =
 				action.call(this,children[i]); }
 		return list.length; },
 	enclosed: function(area) {
-		this.svg.setAttribute('stroke-width',this.width.pick);
-		var list = this.svg.getEnclosureList(area,this.svg);
-		this.svg.setAttribute('stroke-width',this.width.draw);
-		return list; },
+		return this.svg.getEnclosureList(area,this.svg); },
 	hilightArea: function(area) {
 		this.unhilight();
 		return this.forSelected(this.hilightShape,false,false,

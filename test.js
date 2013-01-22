@@ -185,7 +185,7 @@ test("within area",5,function(){
 	move(20,10);click(); move(20,20);click();
 	erase(8,22,22,8); drawn('dot(10 10),dot(10 20),dot(20 10),dot(20 20)');
 	move(15,15);click();
-	cover.width.pick = 1;
+	cover.width.draw = 1;
 	erase(9,9,21,11); drawn('dot(10 20),dot(20 20),dot(15 15)');
 	move(10,10);click(); move(20,10);click();
 	erase(21,11,9,21); drawn('dot(10 10),dot(20 10)'); });
