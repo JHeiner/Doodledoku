@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- Copyright © 2013, Jeremy Heiner (github.com/JHeiner).
+All rights reserved. See LICENSE file. -->
+<head>
+<title>Doodledoku Failure</title>
+<script src="jquery-1.8.3/jquery.min.js"></script>
+<link rel=stylesheet href="jquery-ui-1.9.2/black-tie.css">
+<script src="jquery-ui-1.9.2/jquery-ui.js"></script>
+<style>
+	p { line-height:150%; margin: 5px 0 10px 0; }
+	kbd,em { border: solid grey 1px; padding: 0 2px; background:white; }
+	em,i { font-size: 0.9em; }
+	button,textarea { margin: 10px 0; }
+	#details { width:100%; font-size:0.9em; font-family:monospace; }
+</style>
+<script src="bugFail.js"></script>
+</head>
+<body style="background:#eee;padding:10px;min-width:715px;">
+<div class="ui-widget-content ui-corner-all" style="padding: 0 15px">
+<img src="pencil-128.png" style="vertical-align:bottom;">
+<h1 style="display:inline;position:relative;left:-20px;font: italic 80pt sans-serif;letter-spacing:-7pt;">Doodledoku</h1>
+</div>
+<div class="ui-tabs-nav ui-widget-header ui-corner-top" style="padding: 1em 1.4em">
+<h2 style="display:inline;">Oops!</h2>
+</div>
+<div class="ui-widget ui-widget-content ui-tabs-panel ui-corner-bottom" style="padding: 1em 1.4em">
+<p>Sorry about this, but something unexpected has happened.
+You can help ensure this problem gets fixed by sending a bug report.
+The box below hopefully contains details to help me figure out what's wrong.
+It would be very helpful if you can copy + paste these details into the report.
+I can't do this for you because of the rules built into Chrome.
+But I have selected the text so all you have to do is hit
+<kbd>ctrl</kbd>+<kbd>C</kbd> (or choose <em>Copy</em> from the menu).</p>
+<p>After you have done that, click the button below to open up the report page.
+When you get there, paste the details into the large text area on the left.
+Just above that, select the category <em>Report a problem</em>
+and fill in something for the <em>Subject</em>.
+Finish up by clicking on the <kbd>SUBMIT</kbd> button at the bottom.</p>
+<p>Note that your Options script might appear in the details.
+If it does, then the problem is somewhere in your script.
+You can still send in the report: I will be happy to take a look.</p>
+<p>Thank you!</p>
+<button id=report>OK, details are copied: open the report page!</button>
+<textarea id=details readonly=true></textarea>

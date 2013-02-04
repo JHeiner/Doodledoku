@@ -149,9 +149,19 @@ TabInfo.prototype.executeScript = function(details,callback) {
 	chrome.tabs.executeScript(this.tab.id,details,
 		(!callback)?null:this[callback].bind(this) ); }
 
+var bugDetails = [];
+
+chrome.extension.onMessage.addListener(function(message,sender,respond){
+	if (-1 == chrome.extension.getURL('').indexOf('/'+sender.id+'/')) {
+		console.warn("message ignored:",message,sender);
+		return; }
+	switch (message) {
+	case "bugDetails":
+		respond(bugDetails.join('\n\n')); bugDetails = []; break;
+	default:
+		console.warn("message unknown:",message,sender); break; } });
+
 TabInfo.prototype.bugReport = function(method,results) {
-	chrome.tabs.create({openerTabId:this.tab.id,url:
-"https://chrome.google.com/webstore/support/adcigljcdlemflbekljdfohfpipeolof"});
 	var flags = [];
 	if (this.allFrames) flags.push('allFrames');
 	if (this.doodling) flags.push('doodling');
@@ -160,22 +170,17 @@ TabInfo.prototype.bugReport = function(method,results) {
 	if (this.tab.selected) flags.push('selected');
 	var lastError = chrome.extension.lastError;
 	var colon = this.tab.url.indexOf(':');
-	var scheme = this.tab.url.substring(0,colon);
-	if (scheme=='http' || scheme=='https') {
+	var url = this.tab.url.substring(0,colon);
+	if (url=='http' || url=='https') {
 		var end = this.tab.url.indexOf('/',colon+3);
-		scheme = (-1 == end) ? this.tab.url : this.tab.url.substring(0,end); }
-	alert("Something unexpected has happened.\n\
-A new tab has been opened to the issue reporting page.\n\
-Please select the following details about the problem:\n\
-\n\
-\t"+method+"("+(results?JSON.stringify(results):'')+")\n\
-\t"+flags.join(" ")+" "+this.tab.status+"\n\
-\t"+scheme+(lastError?("\n\t"+lastError.message):'')+"\n\
-\n\
-Copy (with CTRL+C) and paste* into the issue description box.\n\
-*You will need to dismiss this dialog before you can paste.\n\
-Choose category, fill in subject, add any comments you want,\n\
-then click 'SUBMIT'... Thank you!");
+		url = (-1 == end) ? this.tab.url : this.tab.url.substring(0,end); }
+	var details = method+"("+(results?JSON.stringify(results):'')+")"
+		+"\n"+flags.join(" ")+" "+this.tab.status+"\n"+url;
+	if (lastError) details += ("\n"+lastError.message);
+	if (this.options) details += ("\n"+this.options);
+	bugDetails.push(details);
+	chrome.tabs.create({ openerTabId:this.tab.id,
+		url:chrome.extension.getURL('bugFail.html') });
 	this.destroy(); }
 
 TabInfo.prototype.validResults = function(method,results) {
@@ -199,18 +204,16 @@ chrome.browserAction.onClicked.addListener(function(tab) {
 	if (tab.url.substr(0,5)=='http:' || tab.url.substr(0,6)=='https:') {
 		var webStoreHostAt = tab.url.indexOf('//chrome.google.com/');
 		if (webStoreHostAt==5 || webStoreHostAt==6) {
-			alert("Chrome Web Store pages don't allow doodling.\n\
-Please try again with a page outside the Web Store.");
+			chrome.tabs.create({ openerTabId:tab.id,
+				url:chrome.extension.getURL('bugPerm.html') });
 			return; } }
 	else if (tab.url.substr(0,5)!='file:') {
-		alert("Sorry, but pages that are handled specially by the browser\n\
-(such as: "+tab.url+")\n\
-don't allow doodling.\n\
-Please try again with a regular HTML web page.");
+		chrome.tabs.create({ openerTabId:tab.id,
+			url:chrome.extension.getURL('bugPerm.html') });
 		return; }
 	if (tab.status != 'complete') {
-		alert("Sorry, but this page hasn't finished loading yet.\n\
-Please try again once it has.");
+		alert("Sorry, but this page hasn't finished loading yet.\n"
+		      +"Please try again once it has.");
 		return; }
 	new TabInfo(tab).inject(); });
 
@@ -249,6 +252,7 @@ TabInfo.prototype.sendOptions = function(local,sync) {
 		this.jQuery = true;
 		this.executeScript({file:"jquery-1.8.3/jquery.min.js"},"readOptions");
 		return; }
+	this.options = options;
 	this.executeScript({code:
 		"if (document.body.nodeName != 'FRAMESET') {\n window.doodles ="
 		+" new Doodles.Extension(new Doodles.CoverBody(document.body,window));"
