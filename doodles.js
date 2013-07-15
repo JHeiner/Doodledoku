@@ -1,6 +1,12 @@
 // Copyright © 2012-2013, Jeremy Heiner (github.com/JHeiner).
 // All rights reserved. See LICENSE file.
 
+/*jshint bitwise:true camelcase:true forin:true immed:true latedef:true
+         newcap:true noarg:true noempty:true nonew:true regexp:true
+         undef:true unused:true strict:true trailing:true */
+// curly:true eqeqeq:true indent:4 plusplus:true quotmark:true maxcomplexity:4
+/*jshint smarttabs:true es5:true */
+
 "use strict";
 
 // everything in this file is defined inside of the Doodles object.
@@ -224,7 +230,7 @@ Doodles.DOM.prototype =
 		this.catcher.setAttribute('pointer-events','fill');
 		this.undoClip.setAttribute('pointer-events','visiblePainted'); },
 	rubberXYWH: function(x,y,w,h) {
- 		this.rubberShow.setAttribute('x', this.rubberArea.x = x);
+		this.rubberShow.setAttribute('x', this.rubberArea.x = x);
 		this.rubberShow.setAttribute('y', this.rubberArea.y = y);
 		this.rubberShow.setAttribute('width', this.rubberArea.width = w);
 		this.rubberShow.setAttribute('height', this.rubberArea.height = h);
@@ -479,13 +485,13 @@ Doodles.Events.prototype =
 		this.ctrlKey(event);
 		if (this.pointerMove(event))
 			this.fsm.edge('mousemove');
-		if (0 == event.button) {
+		if (0 === event.button) {
 			this.pointer.remember();
 			this.fsm.edge('mousedown'); }
 		this.focusMouse(); },
 	moveMouse: function(event) {
 		if (this.fsm.state.mouse && event.which != 1) {
-			var ctrl = this.fsm.state.ctrl
+			var ctrl = this.fsm.state.ctrl;
 			if (ctrl) this.fsm.edge('ctrlup');
 			this.fsm.edge('mouseup');
 			if (ctrl) this.fsm.edge('ctrldown'); }
@@ -497,7 +503,7 @@ Doodles.Events.prototype =
 		this.ctrlKey(event);
 		if (this.pointerMove(event))
 			this.fsm.edge('mousemove');
-		if (0 == event.button) {
+		if (0 === event.button) {
 			this.fsm.edge('mouseup'); }
 		this.focusMouse(); },
 	focusMouse: function() {
@@ -543,8 +549,12 @@ Doodles.CoverBlock = function(block,window)
 {
 	this.args = {block:block,window:window};
 
+	var document = block.ownerDocument;
+	if (window.document != document)
+		throw new Error("block is not within the window");
+
 	var computed = window.getComputedStyle(block);
-	if (block.ownerDocument.body == block
+	if (document.body == block
 		|| (computed.position != 'static' && computed.position != 'relative')
 		|| computed.top != 'auto' || computed.left != 'auto'
 		|| computed.right != 'auto' || computed.bottom != 'auto' )
@@ -613,7 +623,11 @@ Doodles.CoverBody = function(body,window)
 {
 	this.args = {body:body,window:window};
 
-	if (body.ownerDocument.body != body)
+	var document = body.ownerDocument;
+	if (window.document != document)
+		throw new Error("body is not within the window");
+
+	if (document.body != body)
 		throw new Error("the 1st arg must be the <body> element");
 
 	this.svg = Doodles.svgNew('svg',body);
@@ -702,6 +716,23 @@ Doodles.Extension.prototype =
 		delete this.destroy;
 		delete this.receive; }
 };
+
+Doodles.cover = function(element,window) {
+	var document = element.ownerDocument;
+	if (!window) window = document.defaultView;
+	return (document.body == element)
+		? new Doodles.CoverBody(element,window)
+		: new Doodles.CoverBlock(element,window); };
+
+Doodles.extension = function(window) {
+	var body = window.document.body;
+	window.doodles = new Doodles.Extension(Doodles.cover(body,window));};
+
+Doodles.ifNotFrameset = function(window,action) {
+	if (window.document.body.nodeName == 'FRAMESET')
+		return;
+	Doodles.extension(window);
+	if (action) action(); };
 
 'OK';
 
