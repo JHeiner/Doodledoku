@@ -257,7 +257,7 @@ TabInfo.prototype.sendOptions = function(local,sync) {
 		: ("code" in sync) ? sync.code : "";
 	if (options.indexOf('"required jQuery";') != -1 && !('jQuery' in this)) {
 		this.jQuery = true;
-		this.executeScript({file:"jquery-1.8.3/jquery.min.js"},"readOptions");
+		this.executeScript({file:"jquery-2.0.3/jquery.min.js"},"readOptions");
 		return; }
 	this.options = options;
 	this.executeScript({code: "Doodles.ifNotFrameset( window, function() {"
